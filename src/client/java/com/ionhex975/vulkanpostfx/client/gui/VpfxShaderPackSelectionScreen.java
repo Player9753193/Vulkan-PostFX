@@ -1,0 +1,936 @@
+package com.ionhex975.vulkanpostfx.client.gui;
+
+import com.ionhex975.vulkanpostfx.VulkanPostFX;
+import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
+import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
+import com.ionhex975.vulkanpostfx.client.reload.VpfxHotReloadManager;
+import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
+import com.ionhex975.vulkanpostfx.client.ui.model.VpfxUiState;
+import com.ionhex975.vulkanpostfx.client.ui.service.VpfxUiService;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Reese-style VPFX settings screen.
+ *
+ * Visual goals:
+ * - centered 16:9-bounded panel
+ * - search-style top bar
+ * - horizontal tabs
+ * - dark translucent content frame
+ * - flat option rows and compact bottom buttons
+ */
+public final class VpfxShaderPackSelectionScreen extends Screen {
+    private static final int ROW_HEIGHT = 22;
+    private static final int SETTING_ROW_MIN_HEIGHT = 38;
+    private static final int PACK_ROW_MIN_HEIGHT = 40;
+    private static final int DESCRIPTION_LINE_HEIGHT = 9;
+    private static final int TAB_HEIGHT = 24;
+
+    // Footer 按钮外边距：按钮上边距 = 下边距 = Done 右边距
+    private static final int FOOTER_INSET = 8;
+    private static final int FOOTER_HEIGHT = ROW_HEIGHT + FOOTER_INSET * 2;
+    private static final int PACKS_PER_PAGE = 5;
+
+    private static final int BG_PANEL = 0xD8101014;
+    private static final int BG_HEADER = 0xE0000000;
+    private static final int BG_FRAME = 0xAA000000;
+    private static final int BG_ROW = 0x381E2026;
+    private static final int BG_ROW_HOVER = 0x66313640;
+    private static final int BG_ROW_ACTIVE = 0x66364F68;
+    private static final int BG_INPUT = 0x90000000;
+    private static final int BORDER_SOFT = 0x225A8DAA;
+
+    private static final int TEXT_PRIMARY = 0xFFEDEDF0;
+    private static final int TEXT_SECONDARY = 0xFFB7BAC4;
+    private static final int TEXT_MUTED = 0xFF808890;
+    private static final int TEXT_ACCENT = 0xFF66CCFF;
+    private static final int TEXT_SUCCESS = 0xFF62D394;
+    private static final int TEXT_WARN = 0xFFFFB454;
+    private static final int TEXT_ERROR = 0xFFFF6B6B;
+    private static final int TEXT_HOVER = 0xFFFFFFFF;
+
+    private final Screen parent;
+    private final List<ClickZone> clickZones = new ArrayList<>();
+
+    private UiPage currentPage = UiPage.PACKS;
+    private int packPage;
+    private int packListScroll;
+    private int packListTop;
+    private int packListBottom;
+    private int packListViewportHeight;
+    private int packListContentHeight;
+    private boolean reloadInProgress;
+    private Component statusMessage;
+
+    public VpfxShaderPackSelectionScreen(Screen parent) {
+        this(parent, Component.translatable("screen.vulkanpostfx.shaderpacks.status.ready"));
+    }
+
+    private VpfxShaderPackSelectionScreen(Screen parent, Component statusMessage) {
+        super(Component.translatable("screen.vulkanpostfx.shaderpacks.title"));
+        this.parent = parent;
+        this.statusMessage = statusMessage;
+    }
+
+    @Override
+    protected void init() {
+        ActiveShaderPackManager.bootstrap();
+        VpfxUiService.get().refreshRegistry();
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        clickZones.clear();
+
+        VpfxUiState state = VpfxUiService.get().snapshot();
+        Layout layout = layout();
+
+        drawChrome(graphics, layout, state);
+        drawTabs(graphics, layout, mouseX, mouseY);
+
+        switch (currentPage) {
+            case PACKS -> drawPacksPage(graphics, layout, state, mouseX, mouseY);
+            case GENERAL -> drawGeneralPage(graphics, layout, state, mouseX, mouseY);
+            case BACKEND -> drawBackendPage(graphics, layout, state, mouseX, mouseY);
+            case DEBUG -> drawDebugPage(graphics, layout, state, mouseX, mouseY);
+            case DEVELOPER -> drawDeveloperPage(graphics, layout, state, mouseX, mouseY);
+            case ABOUT -> drawAboutPage(graphics, layout, mouseX, mouseY);
+        }
+
+        drawFooter(graphics, layout, mouseX, mouseY);
+        drawTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (event.button() != 0) {
+            return super.mouseClicked(event, doubleClick);
+        }
+
+        double mouseX = event.x();
+        double mouseY = event.y();
+
+        for (ClickZone zone : clickZones) {
+            if (zone.contains(mouseX, mouseY)) {
+                if (zone.enabled) {
+                    zone.action.run();
+                }
+                return true;
+            }
+        }
+
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (currentPage == UiPage.PACKS && packListContentHeight > packListViewportHeight) {
+            Layout layout = layout();
+            int top = packListTop > 0 ? packListTop : layout.bodyY;
+            int bottom = packListBottom > top ? packListBottom : layout.frameY + layout.frameHeight - 8;
+            if (contains(mouseX, mouseY, layout.bodyX, top, layout.bodyWidth, bottom - top)) {
+                int maxScroll = Math.max(0, packListContentHeight - packListViewportHeight);
+                int delta = (int) Math.round(-scrollY * 28.0D);
+                packListScroll = clamp(packListScroll + delta, 0, maxScroll);
+                return true;
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public void onClose() {
+        VpfxScreenBridge.setScreen(parent);
+    }
+
+    private void drawChrome(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state) {
+        fill(graphics, layout.outerX, layout.outerY, layout.outerX + layout.outerWidth, layout.outerY + layout.outerHeight, BG_PANEL);
+        border(graphics, layout.outerX, layout.outerY, layout.outerWidth, layout.outerHeight, BORDER_SOFT);
+
+        fill(graphics, layout.searchX, layout.searchY, layout.searchX + layout.searchWidth, layout.searchY + 20, BG_INPUT);
+        border(graphics, layout.searchX, layout.searchY, layout.searchWidth, 20, BORDER_SOFT);
+        text(graphics, "Search settings...", layout.searchX + 7, layout.searchY + 6, TEXT_MUTED);
+
+        text(graphics, "Vulkan PostFX", layout.contentX, layout.titleY, TEXT_PRIMARY);
+        text(graphics, "Settings", layout.contentX + this.font.width("Vulkan PostFX") + 7, layout.titleY, TEXT_ACCENT);
+
+        String compactState = state.vpfxEnabled() ? "ON" : "OFF";
+        int compactColor = state.failedEffectId().isBlank() ? (state.vpfxEnabled() ? TEXT_SUCCESS : TEXT_MUTED) : TEXT_ERROR;
+        String backend = state.nativeDirect() ? "Native" : state.postChainRuntime() ? "PostChain" : "Vanilla";
+        String status = reloadInProgress ? "Reloading..." : compactState + " · " + backend + " · " + state.activePackId();
+        textRight(graphics, status, layout.contentX + layout.contentWidth, layout.titleY, compactColor);
+
+        fill(graphics, layout.frameX, layout.frameY, layout.frameX + layout.frameWidth, layout.frameY + layout.frameHeight, BG_FRAME);
+        border(graphics, layout.frameX, layout.frameY, layout.frameWidth, layout.frameHeight, BORDER_SOFT);
+        fill(graphics, layout.frameX, layout.frameY, layout.frameX + layout.frameWidth, layout.frameY + TAB_HEIGHT, BG_HEADER);
+        fill(graphics, layout.frameX, layout.frameY + TAB_HEIGHT - 1, layout.frameX + layout.frameWidth, layout.frameY + TAB_HEIGHT, 0xAA345E7D);
+
+        String stateText = reloadInProgress ? "VPFX reload in progress" : textOf(statusMessage);
+        text(graphics, stateText, layout.frameX + 8, layout.frameY + layout.frameHeight + 6, reloadInProgress ? TEXT_WARN : TEXT_SECONDARY);
+    }
+
+    private void drawTabs(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
+        int tabCount = UiPage.values().length;
+        int tabWidth = Math.max(72, layout.frameWidth / tabCount);
+        int x = layout.frameX;
+
+        for (UiPage page : UiPage.values()) {
+            int w = page == UiPage.ABOUT ? layout.frameX + layout.frameWidth - x : tabWidth;
+            boolean active = currentPage == page;
+            boolean hovered = contains(mouseX, mouseY, x, layout.frameY, w, TAB_HEIGHT);
+            int bg = active ? 0x66364F68 : hovered ? 0x44313640 : 0x00000000;
+            fill(graphics, x, layout.frameY, x + w, layout.frameY + TAB_HEIGHT, bg);
+            if (active) {
+                fill(graphics, x, layout.frameY + TAB_HEIGHT - 2, x + w, layout.frameY + TAB_HEIGHT, TEXT_ACCENT);
+            }
+            int color = active ? TEXT_ACCENT : hovered ? TEXT_HOVER : TEXT_SECONDARY;
+            textCentered(graphics, page.label, x, layout.frameY + 8, w, color);
+            int zoneX = x;
+            clickZones.add(new ClickZone(zoneX, layout.frameY, w, TAB_HEIGHT, true, () -> {
+                if (currentPage != page) {
+                    currentPage = page;
+                    packListScroll = 0;
+                }
+            }, page.description));
+            x += w;
+        }
+    }
+
+    private void drawPacksPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
+        int x = layout.bodyX;
+        int y = layout.bodyY;
+        int width = layout.bodyWidth;
+
+        y = section(graphics, x, y, "Active Pack");
+        y = infoRow(graphics, x, y, width, "Current", state.activePackName() + " [" + state.activePackId() + "]", state.failedEffectId().isBlank() ? TEXT_SUCCESS : TEXT_ERROR);
+        y = infoRow(graphics, x, y, width, "Runtime", backendSummary(state), state.nativeDirect() ? TEXT_SUCCESS : TEXT_SECONDARY);
+        y += 6;
+
+        int actionW = (width - 16) / 3;
+        actionButton(graphics, x, y, actionW, "Reload", !reloadInProgress, mouseX, mouseY,
+                () -> beginReload(VpfxHotReloadManager.hotReloadCurrentPack(Minecraft.getInstance(), true, "settings:reload-current"),
+                        Component.literal("Reloading current VPFX pack..."), Component.literal("Reloaded current VPFX pack")),
+                "Reload the currently active VPFX pack.");
+        actionButton(graphics, x + actionW + 8, y, actionW, "Auto", !reloadInProgress, mouseX, mouseY,
+                () -> beginReload(VpfxHotReloadManager.selectAutoAndReload(Minecraft.getInstance(), "settings:select-auto"),
+                        Component.literal("Selecting native-compatible VPFX pack..."), Component.literal("Auto selection completed")),
+                "Prefer native-compatible external VPFX packs.");
+        actionButton(graphics, x + (actionW + 8) * 2, y, actionW, "Builtin", !reloadInProgress, mouseX, mouseY,
+                () -> beginReload(VpfxHotReloadManager.selectBuiltinAndReload(Minecraft.getInstance(), "settings:select-builtin"),
+                        Component.literal("Loading built-in debug pack..."), Component.literal("Loaded built-in debug pack")),
+                "Load the built-in VPFX debug pack.");
+        y += ROW_HEIGHT + 10;
+
+        y = section(graphics, x, y, "Available Packs");
+        List<ShaderPackContainer> packs = ActiveShaderPackManager.getDiscoveredPacks();
+
+        int listTop = y;
+        int listBottom = layout.frameY + layout.frameHeight - 8;
+        int listHeight = Math.max(40, listBottom - listTop);
+        packListTop = listTop;
+        packListBottom = listBottom;
+        packListViewportHeight = listHeight;
+        packListContentHeight = calculatePackListContentHeight(packs, width);
+        packListScroll = clamp(packListScroll, 0, Math.max(0, packListContentHeight - packListViewportHeight));
+
+        if (packListContentHeight > packListViewportHeight) {
+            textRight(graphics, "scroll " + (packListScroll + 1) + "/" + Math.max(1, packListContentHeight - packListViewportHeight + 1), x + width, listTop - 12, TEXT_MUTED);
+        }
+
+        graphics.enableScissor(x, listTop, x + width, listBottom);
+        int rowY = listTop - packListScroll;
+        if (packs.isEmpty()) {
+            plainRow(graphics, x, rowY, width, "No VPFX packs found", "Put .zip packs in shaderpacks/", TEXT_MUTED, mouseX, mouseY, null, "No external or builtin VPFX packs were discovered.");
+        } else {
+            for (ShaderPackContainer pack : packs) {
+                int rowHeight = packRowHeight(pack, width);
+                if (rowY + rowHeight >= listTop && rowY <= listBottom) {
+                    packRow(graphics, x, rowY, width, pack, mouseX, mouseY, listTop, listBottom);
+                }
+                rowY += rowHeight + 4;
+            }
+        }
+        graphics.disableScissor();
+
+        drawPackListScrollbar(graphics, x + width - 4, listTop, 3, listHeight);
+    }
+
+    private void drawGeneralPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
+        int x = layout.bodyX;
+        int y = layout.bodyY;
+        int width = layout.bodyWidth;
+        y = section(graphics, x, y, "General");
+        y = settingRow(graphics, x, y, width, "Enable VPFX", state.vpfxEnabled() ? "ON" : "OFF", state.vpfxEnabled() ? TEXT_SUCCESS : TEXT_MUTED,
+                mouseX, mouseY, () -> {
+                    boolean enabled = PostFxRuntimeState.toggleDebugEffectEnabled();
+                    PostFxRuntimeState.requestReapply();
+                    statusMessage = Component.literal("VPFX " + (enabled ? "enabled" : "disabled"));
+                }, "Toggle the active VPFX effect chain. Same idea as F8.");
+        y = settingRow(graphics, x, y, width, "Shadow Depth Debug", state.shadowDepthDebug() ? "ON" : "OFF", state.shadowDepthDebug() ? TEXT_WARN : TEXT_MUTED,
+                mouseX, mouseY, () -> {
+                    boolean enabled = PostFxRuntimeState.toggleShadowDepthDebugView();
+                    PostFxRuntimeState.requestReapply();
+                    statusMessage = Component.literal("Shadow depth debug " + (enabled ? "enabled" : "disabled"));
+                }, "Toggle shadow depth debug view. Same idea as F9.");
+        y = settingRow(graphics, x, y, width, "Current Effect", state.effectId(), TEXT_SECONDARY, mouseX, mouseY, null, "Current effect or runtime post-effect id.");
+        y = settingRow(graphics, x, y, width, "Config Mode", state.configMode(), TEXT_SECONDARY, mouseX, mouseY, null, "Current shader pack selection mode from VPFX config.");
+    }
+
+    private void drawBackendPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
+        int x = layout.bodyX;
+        int y = layout.bodyY;
+        int width = layout.bodyWidth;
+        y = section(graphics, x, y, "Backend");
+        y = settingRow(graphics, x, y, width, "Backend", state.backendId(), state.nativeDirect() ? TEXT_SUCCESS : TEXT_SECONDARY, mouseX, mouseY, null, "The active VPFX runtime backend.");
+        y = settingRow(graphics, x, y, width, "Display Name", state.backendDisplayName(), TEXT_SECONDARY, mouseX, mouseY, null, "Human-readable backend name.");
+        y = settingRow(graphics, x, y, width, "Native Direct", yesNo(state.nativeDirect()), state.nativeDirect() ? TEXT_SUCCESS : TEXT_MUTED, mouseX, mouseY, null, "Whether native direct framegraph execution is active.");
+        y = settingRow(graphics, x, y, width, "PostChain Runtime", yesNo(state.postChainRuntime()), state.postChainRuntime() ? TEXT_WARN : TEXT_MUTED, mouseX, mouseY, null, "Whether Minecraft PostChain backend is active.");
+        y = settingRow(graphics, x, y, width, "Passes / Targets", state.passCount() + " / " + state.targetCount(), TEXT_SECONDARY, mouseX, mouseY, null, "Parsed pass and target counts for the active pack.");
+        y = settingRow(graphics, x, y, width, "Fallback Reason", state.fallbackReason(), state.fallbackReason().equals("none") ? TEXT_MUTED : TEXT_WARN, mouseX, mouseY, null, "Why VPFX skipped or fell back, if applicable.");
+    }
+
+    private void drawDebugPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
+        int x = layout.bodyX;
+        int y = layout.bodyY;
+        int width = layout.bodyWidth;
+        y = section(graphics, x, y, "Debug");
+        y = settingRow(graphics, x, y, width, "VPFX Status HUD", PostFxRuntimeState.isDebugHudVisible() ? "ON" : "OFF", PostFxRuntimeState.isDebugHudVisible() ? TEXT_SUCCESS : TEXT_MUTED,
+                mouseX, mouseY, () -> {
+                    boolean enabled = PostFxRuntimeState.toggleDebugHudVisible();
+                    statusMessage = Component.literal("VPFX status HUD " + (enabled ? "shown" : "hidden"));
+                }, "Show or hide the VPFX text overlay in the top-left corner. Hidden by default for normal users.");
+        y = settingRow(graphics, x, y, width, "Failed Effect", state.failedEffectId().isBlank() ? "none" : state.failedEffectId(), state.failedEffectId().isBlank() ? TEXT_MUTED : TEXT_ERROR, mouseX, mouseY, null, "The external post effect currently marked as failed.");
+        y = settingRow(graphics, x, y, width, "Runtime Namespace", emptyAsNone(state.runtimeNamespace()), TEXT_SECONDARY, mouseX, mouseY, null, "Runtime namespace generated for the active ZIP pack.");
+        y = settingRow(graphics, x, y, width, "Runtime Root", shortPath(state.runtimeRoot()), TEXT_MUTED, mouseX, mouseY, null, "Materialized runtime resource pack root.");
+        y += 8;
+        actionButton(graphics, x, y, width, "Clear Failed State by Reloading Current Pack", !reloadInProgress, mouseX, mouseY,
+                () -> beginReload(VpfxHotReloadManager.hotReloadCurrentPack(Minecraft.getInstance(), true, "settings:clear-failed-reload"),
+                        Component.literal("Reloading to clear failed state..."), Component.literal("Reload completed")),
+                "Reloading a fixed pack should clear the failed-pack guard.");
+    }
+
+    private void drawDeveloperPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
+        int x = layout.bodyX;
+        int y = layout.bodyY;
+        int width = layout.bodyWidth;
+        y = section(graphics, x, y, "Developer Snapshot");
+        y = infoRow(graphics, x, y, width, "Pack ID", state.activePackId(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, "Pack Source", state.activePackSource(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, "Backend ID", state.backendId(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, "Effect", state.effectId(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, "Config", state.configMode(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, "Pass Count", String.valueOf(state.passCount()), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, "Target Count", String.valueOf(state.targetCount()), TEXT_SECONDARY);
+    }
+
+    private void drawAboutPage(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
+        int x = layout.bodyX;
+        int y = layout.bodyY;
+        int width = layout.bodyWidth;
+        y = section(graphics, x, y, "About VPFX");
+        y = plainRow(graphics, x, y, width, "Vulkan PostFX", "Custom VPFX shader pack format and native rendering experiments.", TEXT_ACCENT, mouseX, mouseY, null, "VPFX is not an Iris/OptiFine shaderpack loader.");
+        y = plainRow(graphics, x, y, width, "F7", "Open this settings screen", TEXT_SECONDARY, mouseX, mouseY, null, "Open VPFX settings.");
+        y = plainRow(graphics, x, y, width, "F8", "Toggle VPFX", TEXT_SECONDARY, mouseX, mouseY, null, "Enable or disable the active VPFX effect.");
+        y = plainRow(graphics, x, y, width, "F9", "Shadow depth debug is unbound by default", TEXT_SECONDARY, mouseX, mouseY, null, "This is a heavy debug view and may reduce FPS. Bind it manually in Controls if needed.");
+        y += 8;
+        Path shaderPackDirectory = ActiveShaderPackManager.getShaderPackDirectory();
+        y = plainRow(graphics, x, y, width, "HUD", "Hidden by default", TEXT_SECONDARY, mouseX, mouseY, null, "Enable it from Debug -> VPFX Status HUD if you need the top-left status overlay. It can also be forced with -Dvulkanpostfx.debug.hud=true.");
+        plainRow(graphics, x, y, width, "shaderpacks/", String.valueOf(shaderPackDirectory), TEXT_MUTED, mouseX, mouseY, null, "Put external VPFX ZIP packs here.");
+    }
+
+    private void drawFooter(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
+        int buttonW = 68;
+        int buttonGap = 8;
+
+        int footerTop = layout.outerY + layout.outerHeight - FOOTER_HEIGHT;
+
+        // 核心：上边距 = FOOTER_INSET，下边距 = FOOTER_INSET
+        int buttonY = footerTop + FOOTER_INSET;
+
+        // 核心：Done 右侧边距 = FOOTER_INSET
+        int doneX = layout.outerX + layout.outerWidth - buttonW - FOOTER_INSET;
+        int reloadX = doneX - buttonW - buttonGap;
+        int autoX = reloadX - buttonW - buttonGap;
+
+        actionButton(
+                graphics,
+                autoX,
+                buttonY,
+                buttonW,
+                "Auto",
+                !reloadInProgress,
+                mouseX,
+                mouseY,
+                () -> beginReload(
+                        VpfxHotReloadManager.selectAutoAndReload(
+                                Minecraft.getInstance(),
+                                "settings:footer-auto"
+                        ),
+                        Component.literal("Auto selecting VPFX pack..."),
+                        Component.literal("Auto selection completed")
+                ),
+                "Auto select a native-compatible pack."
+        );
+
+        actionButton(
+                graphics,
+                reloadX,
+                buttonY,
+                buttonW,
+                "Reload",
+                !reloadInProgress,
+                mouseX,
+                mouseY,
+                () -> beginReload(
+                        VpfxHotReloadManager.hotReloadCurrentPack(
+                                Minecraft.getInstance(),
+                                true,
+                                "settings:footer-reload"
+                        ),
+                        Component.literal("Reloading current pack..."),
+                        Component.literal("Reload completed")
+                ),
+                "Reload current pack."
+        );
+
+        actionButton(
+                graphics,
+                doneX,
+                buttonY,
+                buttonW,
+                "Done",
+                true,
+                mouseX,
+                mouseY,
+                this::onClose,
+                "Close VPFX settings."
+        );
+    }
+
+    private int section(GuiGraphicsExtractor graphics, int x, int y, String title) {
+        text(graphics, title, x, y, TEXT_ACCENT);
+        return y + 15;
+    }
+
+    private int calculatePackListContentHeight(List<ShaderPackContainer> packs, int width) {
+        if (packs.isEmpty()) {
+            return SETTING_ROW_MIN_HEIGHT + 4;
+        }
+        int height = 0;
+        for (ShaderPackContainer pack : packs) {
+            height += packRowHeight(pack, width) + 4;
+        }
+        return Math.max(0, height - 4);
+    }
+
+    private int packRowHeight(ShaderPackContainer pack, int width) {
+        String description = packDescription(pack);
+        int descriptionWidth = Math.max(120, width - 104);
+        List<String> descriptionLines = wrapText(description, descriptionWidth);
+        return Math.max(PACK_ROW_MIN_HEIGHT, 24 + descriptionLines.size() * DESCRIPTION_LINE_HEIGHT);
+    }
+
+    private void drawPackListScrollbar(GuiGraphicsExtractor graphics, int x, int y, int width, int height) {
+        int maxScroll = Math.max(0, packListContentHeight - packListViewportHeight);
+        if (maxScroll <= 0 || height <= 8) {
+            return;
+        }
+
+        fill(graphics, x, y, x + width, y + height, 0x44000000);
+        int thumbHeight = Math.max(18, height * packListViewportHeight / Math.max(packListContentHeight, 1));
+        int travel = Math.max(1, height - thumbHeight);
+        int thumbY = y + (int) Math.round((double) packListScroll / (double) maxScroll * travel);
+        fill(graphics, x, thumbY, x + width, thumbY + thumbHeight, 0xAA66CCFF);
+    }
+
+    private int packRow(GuiGraphicsExtractor graphics, int x, int y, int width, ShaderPackContainer pack, int mouseX, int mouseY) {
+        return packRow(graphics, x, y, width, pack, mouseX, mouseY, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    }
+
+    private int packRow(GuiGraphicsExtractor graphics, int x, int y, int width, ShaderPackContainer pack, int mouseX, int mouseY, int clipTop, int clipBottom) {
+        boolean active = ActiveShaderPackManager.isActivePack(pack);
+        String description = packDescription(pack);
+        int descriptionWidth = Math.max(120, width - 104);
+        List<String> descriptionLines = wrapText(description, descriptionWidth);
+        int rowHeight = Math.max(PACK_ROW_MIN_HEIGHT, 24 + descriptionLines.size() * DESCRIPTION_LINE_HEIGHT);
+
+        int zoneY = Math.max(y, clipTop);
+        int zoneBottom = Math.min(y + rowHeight, clipBottom);
+        boolean hovered = zoneBottom > zoneY && contains(mouseX, mouseY, x, zoneY, width, zoneBottom - zoneY);
+        int bg = active ? BG_ROW_ACTIVE : hovered ? BG_ROW_HOVER : BG_ROW;
+        fill(graphics, x, y, x + width, y + rowHeight, bg);
+        if (active) {
+            fill(graphics, x, y, x + 2, y + rowHeight, TEXT_ACCENT);
+        }
+
+        String name = fitText(pack.manifest().name(), Math.max(60, width - 190));
+        text(graphics, name, x + 7, y + 6, active ? TEXT_HOVER : TEXT_PRIMARY);
+
+        String id = "[" + pack.manifest().id() + "]";
+        int idX = x + 7 + this.font.width(name) + 8;
+        int badgeLeft = x + width - 88;
+        if (idX + this.font.width(id) < badgeLeft - 8) {
+            text(graphics, id, idX, y + 6, TEXT_MUTED);
+        }
+
+        String backend = backendBadge(pack);
+        int badgeColor = switch (backend) {
+            case "Native" -> TEXT_SUCCESS;
+            case "PostChain" -> TEXT_WARN;
+            case "Builtin" -> TEXT_ACCENT;
+            default -> TEXT_ERROR;
+        };
+        badge(graphics, x + width - 82, y + 4, 74, backend, badgeColor);
+
+        int descY = y + 20;
+        for (String line : descriptionLines) {
+            text(graphics, line, x + 7, descY, TEXT_SECONDARY);
+            descY += DESCRIPTION_LINE_HEIGHT;
+        }
+
+        String tooltip = pack.manifest().id() + " · " + pack.sourceId() + " · " + passTargetHint(pack)
+                + (description.isBlank() ? "" : "\n" + description);
+        Runnable selectAction = () -> {
+            CompletableFuture<Void> future = "builtin".equals(pack.sourceId())
+                    ? VpfxHotReloadManager.selectBuiltinAndReload(Minecraft.getInstance(), "settings:select-builtin-row")
+                    : VpfxHotReloadManager.selectExternalAndReload(Minecraft.getInstance(), pack.manifest().id(), "settings:select:" + pack.manifest().id());
+            beginReload(
+                    future,
+                    Component.literal("Loading VPFX pack: " + pack.manifest().name()),
+                    Component.literal("Loaded VPFX pack: " + pack.manifest().name())
+            );
+        };
+        if (zoneBottom > zoneY) {
+            clickZones.add(new ClickZone(x, zoneY, width, zoneBottom - zoneY, !reloadInProgress, selectAction, tooltip));
+        }
+        return y + rowHeight + 4;
+    }
+
+    private int settingRow(GuiGraphicsExtractor graphics, int x, int y, int width, String label, String value, int valueColor, int mouseX, int mouseY, Runnable action, String description) {
+        boolean enabled = action != null;
+        int valueWidth = Math.max(90, width / 3);
+        int descriptionWidth = Math.max(120, width - valueWidth - 26);
+        List<String> descriptionLines = wrapText(description, descriptionWidth);
+        int rowHeight = Math.max(SETTING_ROW_MIN_HEIGHT, 24 + descriptionLines.size() * DESCRIPTION_LINE_HEIGHT);
+        boolean hovered = enabled && contains(mouseX, mouseY, x, y, width, rowHeight);
+
+        fill(graphics, x, y, x + width, y + rowHeight, hovered ? BG_ROW_HOVER : BG_ROW);
+        text(graphics, label, x + 7, y + 6, TEXT_PRIMARY);
+        textRight(graphics, fitText(value, valueWidth), x + width - 8, y + 6, valueColor);
+
+        int descY = y + 20;
+        for (String line : descriptionLines) {
+            text(graphics, line, x + 7, descY, TEXT_SECONDARY);
+            descY += DESCRIPTION_LINE_HEIGHT;
+        }
+
+        if (enabled) {
+            clickZones.add(new ClickZone(x, y, width, rowHeight, true, action, description));
+        } else if (description != null) {
+            clickZones.add(new ClickZone(x, y, width, rowHeight, false, () -> {}, description));
+        }
+        return y + rowHeight + 4;
+    }
+
+    private int infoRow(GuiGraphicsExtractor graphics, int x, int y, int width, String label, String value, int valueColor) {
+        int valueWidth = Math.max(100, width / 2);
+        int rowHeight = SETTING_ROW_MIN_HEIGHT;
+        fill(graphics, x, y, x + width, y + rowHeight, BG_ROW);
+        text(graphics, label, x + 7, y + 6, TEXT_MUTED);
+        textRight(graphics, fitText(value, valueWidth), x + width - 8, y + 6, valueColor);
+        String description = value == null ? "" : value;
+        for (String line : wrapText(description, Math.max(120, width - 14))) {
+            text(graphics, line, x + 7, y + 20, TEXT_SECONDARY);
+            break;
+        }
+        return y + rowHeight + 4;
+    }
+
+    private int plainRow(GuiGraphicsExtractor graphics, int x, int y, int width, String title, String value, int titleColor, int mouseX, int mouseY, Runnable action, String description) {
+        boolean enabled = action != null;
+        int descriptionWidth = Math.max(120, width - 14);
+        String visibleDescription = value == null || value.isBlank() ? description : value;
+        List<String> descriptionLines = wrapText(visibleDescription, descriptionWidth);
+        int rowHeight = Math.max(SETTING_ROW_MIN_HEIGHT, 24 + descriptionLines.size() * DESCRIPTION_LINE_HEIGHT);
+        boolean hovered = contains(mouseX, mouseY, x, y, width, rowHeight);
+        fill(graphics, x, y, x + width, y + rowHeight, hovered && enabled ? BG_ROW_HOVER : BG_ROW);
+        text(graphics, title, x + 7, y + 6, titleColor);
+        int descY = y + 20;
+        for (String line : descriptionLines) {
+            text(graphics, line, x + 7, descY, TEXT_SECONDARY);
+            descY += DESCRIPTION_LINE_HEIGHT;
+        }
+        clickZones.add(new ClickZone(x, y, width, rowHeight, enabled, enabled ? action : () -> {}, description));
+        return y + rowHeight + 4;
+    }
+
+    private void actionButton(GuiGraphicsExtractor graphics, int x, int y, int width, String label, boolean enabled, int mouseX, int mouseY, Runnable action, String tooltip) {
+        boolean hovered = enabled && contains(mouseX, mouseY, x, y, width, ROW_HEIGHT);
+        fill(graphics, x, y, x + width, y + ROW_HEIGHT, enabled ? (hovered ? 0xAA263A48 : 0x8820272F) : 0x44191A1F);
+        border(graphics, x, y, width, ROW_HEIGHT, hovered ? 0xAA66CCFF : 0x445A8DAA);
+
+        // Center the label inside the actual button rectangle instead of using
+        // a hand-tuned y+7 baseline. Different GUI scales make the old offset
+        // look like the button has uneven top/bottom padding.
+        int textY = y + (ROW_HEIGHT - this.font.lineHeight) / 2;
+        textCentered(graphics, label, x, textY, width, enabled ? hovered ? TEXT_HOVER : TEXT_SECONDARY : TEXT_MUTED);
+        clickZones.add(new ClickZone(x, y, width, ROW_HEIGHT, enabled, action, tooltip));
+    }
+
+    private void badge(GuiGraphicsExtractor graphics, int x, int y, int width, String label, int color) {
+        fill(graphics, x, y, x + width, y + 14, 0x66000000);
+        border(graphics, x, y, width, 14, color & 0xAAFFFFFF);
+        textCentered(graphics, label, x, y + 4, width, color);
+    }
+
+    private void drawTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        ClickZone hovered = null;
+        for (ClickZone zone : clickZones) {
+            if (zone.tooltip != null && !zone.tooltip.isBlank() && zone.contains(mouseX, mouseY)) {
+                hovered = zone;
+                break;
+            }
+        }
+        if (hovered == null) {
+            return;
+        }
+
+        int maxTextWidth = Math.min(360, Math.max(220, this.width / 3));
+        List<String> lines = wrapText(hovered.tooltip, maxTextWidth);
+        if (lines.isEmpty()) {
+            return;
+        }
+
+        int textWidth = 0;
+        for (String line : lines) {
+            textWidth = Math.max(textWidth, this.font.width(line));
+        }
+
+        int boxW = Math.min(maxTextWidth + 16, textWidth + 16);
+        int boxH = 12 + lines.size() * 10;
+        int x = Math.min(mouseX + 12, this.width - boxW - 8);
+        int y = Math.min(mouseY + 12, this.height - boxH - 8);
+        fill(graphics, x, y, x + boxW, y + boxH, 0xE0000000);
+        border(graphics, x, y, boxW, boxH, 0xAA66CCFF);
+
+        int lineY = y + 7;
+        for (String line : lines) {
+            text(graphics, line, x + 8, lineY, TEXT_SECONDARY);
+            lineY += 10;
+        }
+    }
+
+    private void beginReload(CompletableFuture<Void> reloadFuture, Component pendingMessage, Component successMessage) {
+        reloadInProgress = true;
+        statusMessage = pendingMessage;
+
+        reloadFuture.whenComplete((ignored, throwable) -> Minecraft.getInstance().execute(() -> {
+            reloadInProgress = false;
+
+            if (throwable != null) {
+                String message = throwable.getMessage();
+                statusMessage = Component.literal("VPFX reload failed" + (message == null ? "" : ": " + message));
+                VulkanPostFX.LOGGER.error("[{}] VPFX settings reload action failed", VulkanPostFX.MOD_ID, throwable);
+            } else {
+                statusMessage = successMessage;
+            }
+
+            if (VpfxScreenBridge.isCurrentScreen(this)) {
+                rebuildWidgets();
+            }
+        }));
+    }
+
+    private String backendBadge(ShaderPackContainer pack) {
+        if (pack == null) {
+            return "Broken";
+        }
+        if ("builtin".equals(pack.sourceId())) {
+            return "Builtin";
+        }
+        if (!pack.isVpfxNativePack() || pack.vpfxDefinition() == null) {
+            return "PostChain";
+        }
+        try {
+            return com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeRuntimeSupport.check(
+                    pack.vpfxDefinition().getGraph(),
+                    pack.vpfxDefinition().getManifest()
+            ).isSupported() ? "Native" : "PostChain";
+        } catch (Throwable ignored) {
+            return "Broken";
+        }
+    }
+
+    private String passTargetHint(ShaderPackContainer pack) {
+        if (pack == null || !pack.isVpfxNativePack() || pack.vpfxDefinition() == null) {
+            return "non-native pack";
+        }
+        return "passes=" + pack.vpfxDefinition().getGraph().getPasses().size()
+                + ", targets=" + pack.vpfxDefinition().getGraph().getTargets().size();
+    }
+
+    private String packDescription(ShaderPackContainer pack) {
+        if (pack == null) {
+            return "Broken or unavailable VPFX pack.";
+        }
+        if (pack.isVpfxNativePack() && pack.vpfxDefinition() != null) {
+            String description = pack.vpfxDefinition().getManifest().getDescription();
+            if (description != null && !description.isBlank()) {
+                return description;
+            }
+        }
+        if ("builtin".equals(pack.sourceId())) {
+            return "Built-in VPFX debug pack for testing fallback and diagnostic effects.";
+        }
+        return passTargetHint(pack);
+    }
+
+    private String backendSummary(VpfxUiState state) {
+        String kind = state.nativeDirect() ? "native" : state.postChainRuntime() ? "postchain" : "vanilla";
+        return state.backendId() + " (" + kind + ")";
+    }
+
+    private int maxPage(int count) {
+        if (count <= 0) {
+            return 0;
+        }
+        return (count - 1) / PACKS_PER_PAGE;
+    }
+
+    private Layout layout() {
+        int newWidth = this.width;
+        if ((float) this.width / (float) this.height > 1.7777778F) {
+            newWidth = (int) (this.height * 1.7777778F);
+        }
+
+        int outerWidth = Math.min(newWidth - Math.max(40, newWidth / 20), 960);
+        int outerHeight = Math.min(this.height * 3 / 4 + 48, 620);
+        outerWidth = Math.max(560, Math.min(outerWidth, this.width - 40));
+        outerHeight = Math.max(330, Math.min(outerHeight, this.height - 40));
+
+        int outerX = (this.width - outerWidth) / 2;
+        int outerY = Math.max(12, (this.height - outerHeight) / 2);
+
+        int contentInset = 10;
+        int contentX = outerX + contentInset;
+        int titleY = outerY + 9;
+        int contentWidth = outerWidth - contentInset * 2;
+
+        // Search bar must use the same left/right inset as the main content.
+        // The old code used searchX = outerX + 10 but searchWidth = outerWidth,
+        // so the bar was shifted right and overflowed the panel by 10 px.
+        int searchX = outerX;
+        int searchY = outerY - 26;
+        int searchWidth = outerWidth;
+
+        int frameX = contentX;
+        int frameY = outerY + 34;
+        int frameWidth = contentWidth;
+
+        // Keep the frame above the footer. FOOTER_HEIGHT is no longer the old
+        // compact 28 px value, so frameHeight must be derived from footerTop
+        // instead of using the old hard-coded outerHeight - 68.
+        int footerTop = outerY + outerHeight - FOOTER_HEIGHT;
+        int statusLineReserve = this.font.lineHeight + 9;
+        int frameBottom = footerTop - statusLineReserve;
+        int frameHeight = Math.max(TAB_HEIGHT + 96, frameBottom - frameY);
+
+        int bodyX = frameX + 8;
+        int bodyY = frameY + TAB_HEIGHT + 9;
+        int bodyWidth = frameWidth - 16;
+
+        return new Layout(outerX, outerY, outerWidth, outerHeight, searchX, searchY, searchWidth,
+                contentX, titleY, contentWidth, frameX, frameY, frameWidth, frameHeight, bodyX, bodyY, bodyWidth);
+    }
+
+    private static String yesNo(boolean value) {
+        return value ? "yes" : "no";
+    }
+
+    private static String emptyAsNone(String value) {
+        return value == null || value.isBlank() ? "none" : value;
+    }
+
+    private static String shortPath(String value) {
+        if (value == null || value.isBlank()) {
+            return "none";
+        }
+        int slash = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'));
+        return slash >= 0 ? ".../" + value.substring(slash + 1) : value;
+    }
+
+    private String fitText(String value, int maxPixels) {
+        if (value == null) {
+            return "";
+        }
+        if (this.font.width(value) <= maxPixels) {
+            return value;
+        }
+        String ellipsis = "…";
+        int max = Math.max(1, value.length());
+        while (max > 1 && this.font.width(value.substring(0, max - 1) + ellipsis) > maxPixels) {
+            max--;
+        }
+        return value.substring(0, Math.max(1, max - 1)) + ellipsis;
+    }
+
+    private List<String> wrapText(String value, int maxPixels) {
+        List<String> lines = new ArrayList<>();
+        if (value == null || value.isBlank()) {
+            return lines;
+        }
+        for (String paragraph : value.replace("\r", "").split("\n")) {
+            wrapParagraph(paragraph.trim(), maxPixels, lines);
+        }
+        return lines;
+    }
+
+    private void wrapParagraph(String value, int maxPixels, List<String> lines) {
+        if (value.isBlank()) {
+            return;
+        }
+        StringBuilder current = new StringBuilder();
+        for (String word : value.split("\\s+")) {
+            if (word.isBlank()) {
+                continue;
+            }
+            if (this.font.width(word) > maxPixels) {
+                if (!current.isEmpty()) {
+                    lines.add(current.toString());
+                    current.setLength(0);
+                }
+                splitLongWord(word, maxPixels, lines);
+                continue;
+            }
+
+            String candidate = current.isEmpty() ? word : current + " " + word;
+            if (this.font.width(candidate) <= maxPixels) {
+                current.setLength(0);
+                current.append(candidate);
+            } else {
+                lines.add(current.toString());
+                current.setLength(0);
+                current.append(word);
+            }
+        }
+        if (!current.isEmpty()) {
+            lines.add(current.toString());
+        }
+    }
+
+    private void splitLongWord(String word, int maxPixels, List<String> lines) {
+        StringBuilder current = new StringBuilder();
+        for (int i = 0; i < word.length(); i++) {
+            String candidate = current.toString() + word.charAt(i);
+            if (!current.isEmpty() && this.font.width(candidate) > maxPixels) {
+                lines.add(current.toString());
+                current.setLength(0);
+            }
+            current.append(word.charAt(i));
+        }
+        if (!current.isEmpty()) {
+            lines.add(current.toString());
+        }
+    }
+
+    private static String truncate(String value, int maxChars) {
+        if (value == null) {
+            return "";
+        }
+        if (value.length() <= maxChars) {
+            return value;
+        }
+        return value.substring(0, Math.max(1, maxChars - 1)) + "…";
+    }
+
+    private void fill(GuiGraphicsExtractor graphics, int x1, int y1, int x2, int y2, int color) {
+        graphics.fill(RenderPipelines.GUI, x1, y1, x2, y2, color);
+    }
+
+    private void border(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int color) {
+        fill(graphics, x, y, x + width, y + 1, color);
+        fill(graphics, x, y + height - 1, x + width, y + height, color);
+        fill(graphics, x, y, x + 1, y + height, color);
+        fill(graphics, x + width - 1, y, x + width, y + height, color);
+    }
+
+    private void text(GuiGraphicsExtractor graphics, String text, int x, int y, int color) {
+        graphics.text(this.font, text == null ? "" : text, x, y, color);
+    }
+
+    private void textRight(GuiGraphicsExtractor graphics, String text, int rightX, int y, int color) {
+        String value = text == null ? "" : text;
+        graphics.text(this.font, value, rightX - this.font.width(value), y, color);
+    }
+
+    private void textCentered(GuiGraphicsExtractor graphics, String text, int x, int y, int width, int color) {
+        String value = text == null ? "" : text;
+        graphics.text(this.font, value, x + (width - this.font.width(value)) / 2, y, color);
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static boolean contains(double mouseX, double mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
+
+    private static String textOf(Component component) {
+        return component == null ? "" : component.getString();
+    }
+
+    private enum UiPage {
+        PACKS("Packs", "Select and reload VPFX shader packs."),
+        GENERAL("General", "General VPFX toggles."),
+        BACKEND("Backend", "Runtime backend state."),
+        DEBUG("Debug", "Failure and debug state."),
+        DEVELOPER("Developer", "Raw developer snapshot."),
+        ABOUT("About", "About Vulkan PostFX.");
+
+        private final String label;
+        private final String description;
+
+        UiPage(String label, String description) {
+            this.label = label;
+            this.description = description;
+        }
+    }
+
+    private record Layout(
+            int outerX,
+            int outerY,
+            int outerWidth,
+            int outerHeight,
+            int searchX,
+            int searchY,
+            int searchWidth,
+            int contentX,
+            int titleY,
+            int contentWidth,
+            int frameX,
+            int frameY,
+            int frameWidth,
+            int frameHeight,
+            int bodyX,
+            int bodyY,
+            int bodyWidth
+    ) {
+    }
+
+    private record ClickZone(int x, int y, int width, int height, boolean enabled, Runnable action, String tooltip) {
+        boolean contains(double mouseX, double mouseY) {
+            return VpfxShaderPackSelectionScreen.contains(mouseX, mouseY, x, y, width, height);
+        }
+    }
+}
