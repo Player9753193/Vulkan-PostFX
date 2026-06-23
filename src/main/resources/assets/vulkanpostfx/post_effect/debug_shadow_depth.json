@@ -1,0 +1,30 @@
+{
+  "targets": {
+    "vulkanpostfx:swap": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "vulkanpostfx:post/fullscreen",
+      "fragment_shader": "vulkanpostfx:post/shadow_depth_debug",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "vulkanpostfx:shadow_depth",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "vulkanpostfx:swap"
+    },
+    {
+      "vertex_shader": "vulkanpostfx:post/fullscreen",
+      "fragment_shader": "vulkanpostfx:post/blit",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "vulkanpostfx:swap"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

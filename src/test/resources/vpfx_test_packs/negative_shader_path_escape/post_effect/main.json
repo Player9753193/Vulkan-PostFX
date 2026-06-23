@@ -1,0 +1,16 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "vertex_shader": "negative_shader_path_escape:../secret/bad",
+      "fragment_shader": "negative_shader_path_escape:../secret/bad",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

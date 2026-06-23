@@ -1,0 +1,16 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "vertex_shader": "negative_missing_shader:post/does_not_exist",
+      "fragment_shader": "negative_missing_shader:post/also_missing",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

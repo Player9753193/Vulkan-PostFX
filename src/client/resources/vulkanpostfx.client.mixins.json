@@ -1,0 +1,29 @@
+{
+	"required": true,
+	"package": "com.ionhex975.vulkanpostfx.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"ChunkSectionsToRenderWorldShadowMixin",
+		"GameRendererRenderLevelCaptureMixin",
+		"HudDebugOverlayMixin",
+		"LevelRendererRenderLevelMixin",
+		"OptionsKeyMappingMixin",
+		"GameRendererPostSlotMixin",
+		"RuntimeZipPackProfileInjectorMixin",
+		"ShaderManagerCompilationCacheMixin",
+		"PostChainAccessor",
+		"PostChainProcessMixin",
+		"GameRendererAccessor",
+		"PostPassBuiltinUniformMixin",
+		"PostChainAddToFrameMixin",
+		"LevelRendererShadowAccess",
+		"LevelRendererViewAreaAccessor",
+		"SubmitNodeCollectionMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

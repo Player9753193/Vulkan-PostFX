@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "pack_id": "vpfx_minimal_showcase",
+  "name": "VPFX Minimal Showcase",
+  "version": "1.0.0",
+  "author": "VPFX Team",
+  "description": "Official VPFX v1 alpha minimal showcase pack — warm contrast + subtle vignette using only scene_color.",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": true,
+    "scene_depth": false,
+    "shadow_depth": false,
+    "custom_targets": false,
+    "compute": false
+  }
+}

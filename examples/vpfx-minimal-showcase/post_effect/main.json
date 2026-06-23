@@ -1,0 +1,18 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "final_composite",
+      "debug_label": "Final Composite",
+      "vertex_shader": "vpfx_minimal_showcase:composite/final",
+      "fragment_shader": "vpfx_minimal_showcase:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:scene_color"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

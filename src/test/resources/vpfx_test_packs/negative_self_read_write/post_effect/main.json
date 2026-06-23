@@ -1,0 +1,41 @@
+{
+  "targets": {
+    "negative_self_read_write:loop_target": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "negative_self_read_write:composite/final",
+      "fragment_shader": "negative_self_read_write:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "output": "negative_self_read_write:loop_target"
+    },
+    {
+      "id": "self_writer",
+      "vertex_shader": "negative_self_read_write:composite/final",
+      "fragment_shader": "negative_self_read_write:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "negative_self_read_write:loop_target"
+        }
+      ],
+      "output": "negative_self_read_write:loop_target"
+    },
+    {
+      "vertex_shader": "negative_self_read_write:composite/final",
+      "fragment_shader": "negative_self_read_write:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "negative_self_read_write:loop_target"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

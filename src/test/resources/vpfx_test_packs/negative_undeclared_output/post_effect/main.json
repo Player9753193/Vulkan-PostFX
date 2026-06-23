@@ -1,0 +1,18 @@
+{
+  "targets": {
+    "negative_undeclared_output:swap": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "negative_undeclared_output:composite/final",
+      "fragment_shader": "negative_undeclared_output:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "output": "negative_undeclared_output:not_declared"
+    }
+  ]
+}

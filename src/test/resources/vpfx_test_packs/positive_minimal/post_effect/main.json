@@ -1,0 +1,18 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "final_composite",
+      "debug_label": "Minimal composite to main",
+      "vertex_shader": "official_test_minimal:composite/final",
+      "fragment_shader": "official_test_minimal:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

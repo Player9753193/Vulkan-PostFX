@@ -1,0 +1,16 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "vertex_shader": "negative_undeclared_texture:composite/final",
+      "fragment_shader": "negative_undeclared_texture:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "texture": "undeclared_noise"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

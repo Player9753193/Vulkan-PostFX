@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "pack_id": "negative_undeclared_output",
+  "name": "Undeclared Output Test",
+  "version": "1.0.0",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": true,
+    "scene_depth": false,
+    "shadow_depth": false,
+    "custom_targets": true,
+    "compute": false
+  }
+}

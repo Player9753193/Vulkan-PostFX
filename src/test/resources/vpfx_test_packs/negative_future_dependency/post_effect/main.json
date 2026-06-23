@@ -1,0 +1,29 @@
+{
+  "targets": {
+    "negative_future_dependency:bloom": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "negative_future_dependency:composite/final",
+      "fragment_shader": "negative_future_dependency:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "negative_future_dependency:bloom"
+        }
+      ],
+      "output": "minecraft:main"
+    },
+    {
+      "vertex_shader": "negative_future_dependency:composite/final",
+      "fragment_shader": "negative_future_dependency:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main"
+        }
+      ],
+      "output": "negative_future_dependency:bloom"
+    }
+  ]
+}

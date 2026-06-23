@@ -1,0 +1,16 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "vertex_shader": "negative_non_existent_target:composite/final",
+      "fragment_shader": "negative_non_existent_target:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "negative_non_existent_target:ghost_buffer"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+	"schemaVersion": 1,
+	"id": "vulkanpostfx",
+	"version": "1.15.5+mc26.2-2026-06-22",
+	"name": "Vulkan PostFX",
+	"description": "Vulkan backend post-processing proof of concept for Minecraft 26.2 and 26.2 snapshots. Includes VPFX shader pack menu and hot reload workflow.",
+	"authors": [
+		"IonHex975"
+	],
+	"contact": {
+		"sources": "https://github.com/IonHex975/vulkanpostfx"
+	},
+	"license": "Vulkan PostFX License v1.2",
+	"icon": "assets/vulkanpostfx/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"com.ionhex975.vulkanpostfx.VulkanPostFX"
+		],
+		"client": [
+			"com.ionhex975.vulkanpostfx.client.VulkanPostFXClient"
+		]
+	},
+	"mixins": [
+		"vulkanpostfx.mixins.json",
+		{
+			"config": "vulkanpostfx.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.6",
+		"minecraft": "~26.2-",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

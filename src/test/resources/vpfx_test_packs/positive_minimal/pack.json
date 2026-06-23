@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "pack_id": "official_test_minimal",
+  "name": "VPFX v1 Official Minimal Test",
+  "version": "1.0.0",
+  "author": "VPFX Test Suite",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": true,
+    "scene_depth": false,
+    "shadow_depth": false,
+    "custom_targets": true,
+    "compute": false
+  }
+}
