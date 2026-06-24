@@ -2,9 +2,9 @@ package com.ionhex975.vulkanpostfx.client.gui;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
-import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.reload.VpfxHotReloadManager;
 import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
+import com.ionhex975.vulkanpostfx.client.ui.model.VpfxPackListEntry;
 import com.ionhex975.vulkanpostfx.client.ui.model.VpfxUiState;
 import com.ionhex975.vulkanpostfx.client.ui.service.VpfxUiService;
 import net.minecraft.client.Minecraft;
@@ -232,7 +232,7 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         y += ROW_HEIGHT + 10;
 
         y = section(graphics, x, y, "Available Packs");
-        List<ShaderPackContainer> packs = ActiveShaderPackManager.getDiscoveredPacks();
+        List<VpfxPackListEntry> packs = state.packs();
 
         int listTop = y;
         int listBottom = layout.frameY + layout.frameHeight - 8;
@@ -252,7 +252,7 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         if (packs.isEmpty()) {
             plainRow(graphics, x, rowY, width, "No VPFX packs found", "Put .zip packs in shaderpacks/", TEXT_MUTED, mouseX, mouseY, null, "No external or builtin VPFX packs were discovered.");
         } else {
-            for (ShaderPackContainer pack : packs) {
+            for (VpfxPackListEntry pack : packs) {
                 int rowHeight = packRowHeight(pack, width);
                 if (rowY + rowHeight >= listTop && rowY <= listBottom) {
                     packRow(graphics, x, rowY, width, pack, mouseX, mouseY, listTop, listBottom);
@@ -422,18 +422,18 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         return y + 15;
     }
 
-    private int calculatePackListContentHeight(List<ShaderPackContainer> packs, int width) {
+    private int calculatePackListContentHeight(List<VpfxPackListEntry> packs, int width) {
         if (packs.isEmpty()) {
             return SETTING_ROW_MIN_HEIGHT + 4;
         }
         int height = 0;
-        for (ShaderPackContainer pack : packs) {
+        for (VpfxPackListEntry pack : packs) {
             height += packRowHeight(pack, width) + 4;
         }
         return Math.max(0, height - 4);
     }
 
-    private int packRowHeight(ShaderPackContainer pack, int width) {
+    private int packRowHeight(VpfxPackListEntry pack, int width) {
         String description = packDescription(pack);
         int descriptionWidth = Math.max(120, width - 104);
         List<String> descriptionLines = wrapText(description, descriptionWidth);
@@ -453,12 +453,13 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         fill(graphics, x, thumbY, x + width, thumbY + thumbHeight, 0xAA66CCFF);
     }
 
-    private int packRow(GuiGraphicsExtractor graphics, int x, int y, int width, ShaderPackContainer pack, int mouseX, int mouseY) {
+    private int packRow(GuiGraphicsExtractor graphics, int x, int y, int width, VpfxPackListEntry pack, int mouseX, int mouseY) {
         return packRow(graphics, x, y, width, pack, mouseX, mouseY, Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
-    private int packRow(GuiGraphicsExtractor graphics, int x, int y, int width, ShaderPackContainer pack, int mouseX, int mouseY, int clipTop, int clipBottom) {
-        boolean active = ActiveShaderPackManager.isActivePack(pack);
+    private int packRow(GuiGraphicsExtractor graphics, int x, int y, int width, VpfxPackListEntry pack, int mouseX, int mouseY, int clipTop, int clipBottom) {
+        boolean active = pack.selected();
+        boolean invalid = pack.invalid();
         String description = packDescription(pack);
         int descriptionWidth = Math.max(120, width - 104);
         List<String> descriptionLines = wrapText(description, descriptionWidth);
@@ -471,50 +472,56 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         fill(graphics, x, y, x + width, y + rowHeight, bg);
         if (active) {
             fill(graphics, x, y, x + 2, y + rowHeight, TEXT_ACCENT);
+        } else if (invalid) {
+            fill(graphics, x, y, x + 2, y + rowHeight, TEXT_ERROR);
+        } else if (pack.warning()) {
+            fill(graphics, x, y, x + 2, y + rowHeight, TEXT_WARN);
         }
 
-        String name = fitText(pack.manifest().name(), Math.max(60, width - 190));
-        text(graphics, name, x + 7, y + 6, active ? TEXT_HOVER : TEXT_PRIMARY);
+        String name = fitText(pack.name(), Math.max(60, width - 190));
+        int nameColor = invalid ? TEXT_ERROR : active ? TEXT_HOVER : pack.warning() ? TEXT_WARN : TEXT_PRIMARY;
+        text(graphics, name, x + 7, y + 6, nameColor);
 
-        String id = "[" + pack.manifest().id() + "]";
+        String id = "[" + pack.id() + "]";
         int idX = x + 7 + this.font.width(name) + 8;
         int badgeLeft = x + width - 88;
         if (idX + this.font.width(id) < badgeLeft - 8) {
-            text(graphics, id, idX, y + 6, TEXT_MUTED);
+            text(graphics, id, idX, y + 6, invalid ? TEXT_ERROR : TEXT_MUTED);
         }
 
-        String backend = backendBadge(pack);
-        int badgeColor = switch (backend) {
-            case "Native" -> TEXT_SUCCESS;
-            case "PostChain" -> TEXT_WARN;
-            case "Builtin" -> TEXT_ACCENT;
-            default -> TEXT_ERROR;
-        };
+        String backend = packBadge(pack);
+        int badgeColor = packBadgeColor(pack);
         badge(graphics, x + width - 82, y + 4, 74, backend, badgeColor);
 
         int descY = y + 20;
+        int descColor = invalid ? TEXT_ERROR : pack.warning() ? TEXT_WARN : TEXT_SECONDARY;
         for (String line : descriptionLines) {
-            text(graphics, line, x + 7, descY, TEXT_SECONDARY);
+            text(graphics, line, x + 7, descY, descColor);
             descY += DESCRIPTION_LINE_HEIGHT;
         }
 
-        String tooltip = pack.manifest().id() + " · " + pack.sourceId() + " · " + passTargetHint(pack)
-                + (description.isBlank() ? "" : "\n" + description);
-        Runnable selectAction = () -> {
-            CompletableFuture<Void> future = "builtin".equals(pack.sourceId())
+        String tooltip = packTooltip(pack);
+        Runnable rowAction = () -> {
+            if (!pack.canActivate()) {
+                copyPackDiagnostics(pack);
+                return;
+            }
+
+            CompletableFuture<Void> future = "builtin".equals(pack.source())
                     ? VpfxHotReloadManager.selectBuiltinAndReload(Minecraft.getInstance(), "settings:select-builtin-row")
-                    : VpfxHotReloadManager.selectExternalAndReload(Minecraft.getInstance(), pack.manifest().id(), "settings:select:" + pack.manifest().id());
+                    : VpfxHotReloadManager.selectExternalAndReload(Minecraft.getInstance(), pack.id(), "settings:select:" + pack.id());
             beginReload(
                     future,
-                    Component.literal("Loading VPFX pack: " + pack.manifest().name()),
-                    Component.literal("Loaded VPFX pack: " + pack.manifest().name())
+                    Component.literal("Loading VPFX pack: " + pack.name()),
+                    Component.literal("Loaded VPFX pack: " + pack.name())
             );
         };
         if (zoneBottom > zoneY) {
-            clickZones.add(new ClickZone(x, zoneY, width, zoneBottom - zoneY, !reloadInProgress, selectAction, tooltip));
+            clickZones.add(new ClickZone(x, zoneY, width, zoneBottom - zoneY, !reloadInProgress, rowAction, tooltip));
         }
         return y + rowHeight + 4;
     }
+
 
     private int settingRow(GuiGraphicsExtractor graphics, int x, int y, int width, String label, String value, int valueColor, int mouseX, int mouseY, Runnable action, String description) {
         boolean enabled = action != null;
@@ -651,49 +658,72 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         }));
     }
 
-    private String backendBadge(ShaderPackContainer pack) {
-        if (pack == null) {
-            return "Broken";
-        }
-        if ("builtin".equals(pack.sourceId())) {
-            return "Builtin";
-        }
-        if (!pack.isVpfxNativePack() || pack.vpfxDefinition() == null) {
-            return "PostChain";
-        }
+    private void copyPackDiagnostics(VpfxPackListEntry pack) {
+        String diagnostics = pack.diagnosticsText();
         try {
-            return com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeRuntimeSupport.check(
-                    pack.vpfxDefinition().getGraph(),
-                    pack.vpfxDefinition().getManifest()
-            ).isSupported() ? "Native" : "PostChain";
-        } catch (Throwable ignored) {
-            return "Broken";
+            Minecraft.getInstance().keyboardHandler.setClipboard(diagnostics);
+            statusMessage = Component.literal("Copied VPFX diagnostics: " + pack.name());
+        } catch (Throwable t) {
+            statusMessage = Component.literal("Failed to copy diagnostics: " + t.getClass().getSimpleName());
+            VulkanPostFX.LOGGER.warn("[{}] Failed to copy VPFX pack diagnostics to clipboard", VulkanPostFX.MOD_ID, t);
         }
     }
 
-    private String passTargetHint(ShaderPackContainer pack) {
-        if (pack == null || !pack.isVpfxNativePack() || pack.vpfxDefinition() == null) {
-            return "non-native pack";
+    private String packBadge(VpfxPackListEntry pack) {
+        if (pack.invalid()) {
+            return "Invalid";
         }
-        return "passes=" + pack.vpfxDefinition().getGraph().getPasses().size()
-                + ", targets=" + pack.vpfxDefinition().getGraph().getTargets().size();
+        if (pack.warning()) {
+            return "Warning";
+        }
+        return pack.backendHint();
     }
 
-    private String packDescription(ShaderPackContainer pack) {
-        if (pack == null) {
-            return "Broken or unavailable VPFX pack.";
+    private int packBadgeColor(VpfxPackListEntry pack) {
+        if (pack.invalid()) {
+            return TEXT_ERROR;
         }
-        if (pack.isVpfxNativePack() && pack.vpfxDefinition() != null) {
-            String description = pack.vpfxDefinition().getManifest().getDescription();
-            if (description != null && !description.isBlank()) {
-                return description;
-            }
+        if (pack.warning()) {
+            return TEXT_WARN;
         }
-        if ("builtin".equals(pack.sourceId())) {
-            return "Built-in VPFX debug pack for testing fallback and diagnostic effects.";
-        }
-        return passTargetHint(pack);
+        return switch (pack.backendHint()) {
+            case "Native" -> TEXT_SUCCESS;
+            case "PostChain" -> TEXT_WARN;
+            case "Builtin" -> TEXT_ACCENT;
+            default -> TEXT_SECONDARY;
+        };
     }
+
+    private String passTargetHint(VpfxPackListEntry pack) {
+        if (pack.passCount() <= 0 && pack.targetCount() <= 0) {
+            return pack.invalid() ? "invalid pack" : "non-native pack";
+        }
+        return "passes=" + pack.passCount() + ", targets=" + pack.targetCount();
+    }
+
+    private String packDescription(VpfxPackListEntry pack) {
+        if (pack.invalid()) {
+            return pack.diagnosticSummary() + " · click to copy diagnostics";
+        }
+        if (pack.warning()) {
+            return pack.diagnosticSummary() + " · " + passTargetHint(pack);
+        }
+        return pack.diagnosticSummary() + " · " + passTargetHint(pack);
+    }
+
+    private String packTooltip(VpfxPackListEntry pack) {
+        StringBuilder tooltip = new StringBuilder();
+        tooltip.append(pack.name()).append(" · ").append(pack.source()).append(" · ").append(passTargetHint(pack));
+        tooltip.append("\nStatus: ").append(pack.statusLabel());
+        tooltip.append("\nPath: ").append(pack.sourcePath());
+        if (pack.invalid()) {
+            tooltip.append("\nClick to copy validation diagnostics.");
+        } else {
+            tooltip.append("\n").append(pack.diagnosticSummary());
+        }
+        return tooltip.toString();
+    }
+
 
     private String backendSummary(VpfxUiState state) {
         String kind = state.nativeDirect() ? "native" : state.postChainRuntime() ? "postchain" : "vanilla";

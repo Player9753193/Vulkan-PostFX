@@ -37,6 +37,7 @@ public final class ZipShaderPackSource implements ShaderPackSource {
 
     private final Path shaderPackDirectory;
     private final VpfxNativeZipPackLoader vpfxLoader = new VpfxNativeZipPackLoader();
+    private List<ShaderPackScanIssue> lastScanIssues = List.of();
 
     public ZipShaderPackSource(Path shaderPackDirectory) {
         this.shaderPackDirectory = shaderPackDirectory;
@@ -52,6 +53,7 @@ public final class ZipShaderPackSource implements ShaderPackSource {
         ensureDirectoryExists();
 
         List<ShaderPackContainer> discovered = new ArrayList<>();
+        List<ShaderPackScanIssue> issues = new ArrayList<>();
 
         try (var stream = Files.list(shaderPackDirectory)) {
             stream
@@ -59,7 +61,7 @@ public final class ZipShaderPackSource implements ShaderPackSource {
                     .filter(this::isCandidateZip)
                     .sorted(Comparator.comparing(path -> path.getFileName().toString().toLowerCase(Locale.ROOT)))
                     .forEach(path -> {
-                        ShaderPackContainer container = createContainerFromZip(path);
+                        ShaderPackContainer container = createContainerFromZip(path, issues);
                         if (container != null) {
                             discovered.add(container);
                         }
@@ -71,16 +73,32 @@ public final class ZipShaderPackSource implements ShaderPackSource {
                     shaderPackDirectory,
                     e
             );
+            issues.add(ShaderPackScanIssue.fatal(
+                    SOURCE_ID,
+                    shaderPackDirectory,
+                    "shaderpacks/ scan failure",
+                    "pack_scan_error",
+                    shaderPackDirectory.toString(),
+                    "Failed to scan shader pack directory: " + e.getMessage()
+            ));
         }
 
+        lastScanIssues = List.copyOf(issues);
+
         VulkanPostFX.LOGGER.info(
-                "[{}] Zip shader pack source scanned '{}', found {} valid VPFX zip pack(s)",
+                "[{}] Zip shader pack source scanned '{}', found {} valid VPFX zip pack(s), {} invalid candidate(s)",
                 VulkanPostFX.MOD_ID,
                 shaderPackDirectory,
-                discovered.size()
+                discovered.size(),
+                lastScanIssues.size()
         );
 
         return discovered;
+    }
+
+    @Override
+    public List<ShaderPackScanIssue> getLastScanIssues() {
+        return lastScanIssues;
     }
 
     private void ensureDirectoryExists() {
@@ -140,15 +158,23 @@ public final class ZipShaderPackSource implements ShaderPackSource {
                 && fileName.toLowerCase(Locale.ROOT).endsWith(ZIP_SUFFIX);
     }
 
-    private ShaderPackContainer createContainerFromZip(Path zipPath) {
+    private ShaderPackContainer createContainerFromZip(Path zipPath, List<ShaderPackScanIssue> issues) {
         try {
             VpfxNativePackDefinition vpfxPack = vpfxLoader.tryLoad(zipPath);
             if (vpfxPack == null) {
                 VulkanPostFX.LOGGER.warn(
-                        "[{}] Skipping zip that is not a VPFX native pack: {}",
+                        "[{}] Invalid VPFX zip candidate '{}': missing pack.json at zip root",
                         VulkanPostFX.MOD_ID,
                         zipPath.getFileName()
                 );
+                issues.add(ShaderPackScanIssue.fatal(
+                        SOURCE_ID,
+                        zipPath,
+                        displayName(zipPath),
+                        "manifest_missing",
+                        "pack.json",
+                        "ZIP candidate is missing pack.json at the ZIP root"
+                ));
                 return null;
             }
 
@@ -195,6 +221,14 @@ public final class ZipShaderPackSource implements ShaderPackSource {
                     e.getPath(),
                     e.getMessage()
             );
+            issues.add(ShaderPackScanIssue.fatal(
+                    SOURCE_ID,
+                    zipPath,
+                    displayName(zipPath),
+                    normalizeLoadErrorCode(e.getCode()),
+                    e.getPath(),
+                    e.getMessage()
+            ));
             return null;
         } catch (Exception e) {
             VulkanPostFX.LOGGER.error(
@@ -203,8 +237,36 @@ public final class ZipShaderPackSource implements ShaderPackSource {
                     zipPath,
                     e
             );
+            issues.add(ShaderPackScanIssue.fatal(
+                    SOURCE_ID,
+                    zipPath,
+                    displayName(zipPath),
+                    "pack_unexpected_error",
+                    zipPath.toString(),
+                    e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage())
+            ));
             return null;
         }
+    }
+
+    private static String displayName(Path zipPath) {
+        if (zipPath == null || zipPath.getFileName() == null) {
+            return "unknown VPFX zip";
+        }
+        return zipPath.getFileName().toString();
+    }
+
+    private static String normalizeLoadErrorCode(String code) {
+        if (code == null || code.isBlank()) {
+            return "pack_load_error";
+        }
+        return switch (code) {
+            case "Z001" -> "pack_io_error";
+            case "S001", "S002" -> "shader_missing";
+            case "S003" -> "shader_invalid_id";
+            case "S004", "S005" -> "shader_preprocess_error";
+            default -> code;
+        };
     }
 
     private ShaderPackResourceIndex buildResourceIndex(Path zipPath) throws IOException {

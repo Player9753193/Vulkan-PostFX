@@ -52,6 +52,7 @@ public final class ActiveShaderPackManager {
 
     private static ShaderPackContainer activePack;
     private static List<ShaderPackContainer> discoveredPacks = List.of();
+    private static List<ShaderPackScanIssue> discoveredPackIssues = List.of();
     private static ActiveShaderPackConfig activeConfig = ActiveShaderPackConfig.defaultConfig();
 
     private ActiveShaderPackManager() {
@@ -60,6 +61,7 @@ public final class ActiveShaderPackManager {
     public static void bootstrap() {
         activePack = null;
         discoveredPacks = List.of();
+        discoveredPackIssues = List.of();
 
         SOURCES.clear();
 
@@ -70,11 +72,14 @@ public final class ActiveShaderPackManager {
         SOURCES.add(new ZipShaderPackSource(shaderPackDirectory));
 
         List<ShaderPackContainer> discovered = new ArrayList<>();
+        List<ShaderPackScanIssue> issues = new ArrayList<>();
         for (ShaderPackSource source : SOURCES) {
             discovered.addAll(source.discoverPacks());
+            issues.addAll(source.getLastScanIssues());
         }
 
         discoveredPacks = List.copyOf(discovered);
+        discoveredPackIssues = List.copyOf(issues);
         activeConfig = ActiveShaderPackConfig.loadOrCreate(configPath);
 
         ShaderPackContainer builtinPack = findBuiltinPack(discovered);
@@ -96,7 +101,7 @@ public final class ActiveShaderPackManager {
         }
 
         VulkanPostFX.LOGGER.info(
-                "[{}] Active shader pack set to '{}' from source '{}', id={}, entryEffectKey={}, entryPostEffect={}, entryPostEffectExists={}, discoveredTotal={}, discoveredExternal={}, autoSelectableExternal={}, configMode={}",
+                "[{}] Active shader pack set to '{}' from source '{}', id={}, entryEffectKey={}, entryPostEffect={}, entryPostEffectExists={}, discoveredTotal={}, discoveredInvalid={}, discoveredExternal={}, autoSelectableExternal={}, configMode={}",
                 VulkanPostFX.MOD_ID,
                 activePack.manifest().name(),
                 activePack.sourceId(),
@@ -105,6 +110,7 @@ public final class ActiveShaderPackManager {
                 activePack.manifest().entryPostEffect(),
                 hasActiveEntryPostEffect(),
                 discoveredPacks.size(),
+                discoveredPackIssues.size(),
                 externalPacks.size(),
                 getAutoSelectableExternalPacks().size(),
                 activeConfig.selectionModeForLog()
@@ -119,6 +125,10 @@ public final class ActiveShaderPackManager {
 
     public static List<ShaderPackContainer> getDiscoveredPacks() {
         return discoveredPacks;
+    }
+
+    public static List<ShaderPackScanIssue> getDiscoveredPackIssues() {
+        return discoveredPackIssues;
     }
 
     public static List<ShaderPackContainer> getExternalPacks() {
@@ -520,6 +530,17 @@ public final class ActiveShaderPackManager {
                     pack.resourceIndex().size(),
                     pack.isVpfxNativePack(),
                     isAutoSelectableExternalPack(pack)
+            );
+        }
+
+        for (ShaderPackScanIssue issue : discoveredPackIssues) {
+            VulkanPostFX.LOGGER.warn(
+                    "[{}] Discovered invalid VPFX pack candidate: name='{}', source='{}', path={}, messages={}",
+                    VulkanPostFX.MOD_ID,
+                    issue.displayName(),
+                    issue.sourceId(),
+                    issue.sourcePath(),
+                    issue.messages()
             );
         }
     }

@@ -3,8 +3,10 @@ package com.ionhex975.vulkanpostfx.client.ui.service;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.BuiltinShaderPackSource;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
+import com.ionhex975.vulkanpostfx.client.pack.ShaderPackScanIssue;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxGraphDefinition;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxNativePackDefinition;
+import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxValidationMessage;
 import com.ionhex975.vulkanpostfx.client.reload.VpfxHotReloadManager;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectBridge;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectSource;
@@ -135,6 +137,9 @@ public final class VpfxUiService {
         for (ShaderPackContainer pack : ActiveShaderPackManager.getDiscoveredPacks()) {
             entries.add(toEntry(pack, activePack));
         }
+        for (ShaderPackScanIssue issue : ActiveShaderPackManager.getDiscoveredPackIssues()) {
+            entries.add(toInvalidEntry(issue));
+        }
         return List.copyOf(entries);
     }
 
@@ -144,17 +149,33 @@ public final class VpfxUiService {
         int passes = graphPassCount(pack);
         int targets = graphTargetCount(pack);
         String source = sourceLabel(pack);
+        String sourcePath = pack.sourcePath() == null ? source : pack.sourcePath().toString();
+
+        List<VpfxValidationMessage> messages = pack.isVpfxNativePack() && pack.vpfxDefinition() != null
+                ? pack.vpfxDefinition().getValidationMessages()
+                : List.of();
+        boolean hasWarnings = messages.stream()
+                .anyMatch(message -> message.getSeverity() == VpfxValidationMessage.Severity.WARNING);
 
         boolean nativeCompatible = false;
         String backendHint;
         String diagnostic;
+        VpfxPackListEntry.Status status = valid
+                ? (hasWarnings ? VpfxPackListEntry.Status.WARNING : VpfxPackListEntry.Status.VALID)
+                : VpfxPackListEntry.Status.INVALID;
 
         if (BuiltinShaderPackSource.SOURCE_ID.equals(pack.sourceId())) {
             backendHint = "Builtin";
             diagnostic = valid ? "Builtin debug pack" : "Builtin pack has no entry post effect";
         } else if (!valid) {
-            backendHint = "Broken";
+            backendHint = "Invalid";
             diagnostic = "Missing entry post effect: " + pack.manifest().entryPostEffect();
+            messages = List.of(new VpfxValidationMessage(
+                    VpfxValidationMessage.Severity.FATAL,
+                    "entry_post_effect_missing",
+                    "entry_post_effect",
+                    diagnostic
+            ));
         } else if (pack.isVpfxNativePack() && pack.vpfxDefinition() != null) {
             VpfxNativePackDefinition definition = pack.vpfxDefinition();
             try {
@@ -166,8 +187,9 @@ public final class VpfxUiService {
                 backendHint = nativeCompatible ? "Native" : "PostChain";
                 diagnostic = support.reason();
             } catch (Throwable t) {
-                backendHint = "Broken";
-                diagnostic = "Native check failed: " + t.getClass().getSimpleName();
+                backendHint = "PostChain";
+                diagnostic = "Native check failed; will rely on PostChain fallback: " + t.getClass().getSimpleName();
+                status = VpfxPackListEntry.Status.WARNING;
             }
         } else {
             backendHint = "PostChain";
@@ -175,16 +197,44 @@ public final class VpfxUiService {
         }
 
         return new VpfxPackListEntry(
+                status,
                 pack.manifest().id(),
                 pack.manifest().name(),
                 source,
+                sourcePath,
                 selected,
+                valid,
                 valid,
                 nativeCompatible,
                 backendHint,
                 passes,
                 targets,
-                diagnostic
+                diagnostic,
+                messages
+        );
+    }
+
+    private static VpfxPackListEntry toInvalidEntry(ShaderPackScanIssue issue) {
+        List<VpfxValidationMessage> messages = issue.messages();
+        String summary = messages.isEmpty()
+                ? "Invalid VPFX pack"
+                : messages.get(0).getMessage();
+
+        return new VpfxPackListEntry(
+                VpfxPackListEntry.Status.INVALID,
+                issue.packId(),
+                issue.displayName(),
+                issue.sourceId(),
+                issue.sourcePath() == null ? "unknown" : issue.sourcePath().toString(),
+                false,
+                false,
+                false,
+                false,
+                "Invalid",
+                0,
+                0,
+                summary,
+                messages
         );
     }
 
