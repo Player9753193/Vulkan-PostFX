@@ -298,9 +298,17 @@ public final class VpfxNativeRuntimeSupport {
     }
 
     public static boolean isExecuteEnabled() {
-        if (PostFxRuntimeState.isNativeRuntimeFallbackActive()
-                && PostFxRuntimeState.activeRuntimeBackendUsesPostChain()) {
-            return false;
+        if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
+            var currentExternalId = PostFxRuntimeState.getActiveExternalPostEffectId();
+            if (PostFxRuntimeState.isNativeRuntimeFallbackStaleFor(currentExternalId)) {
+                PostFxRuntimeState.clearStaleNativeRuntimeFallbackFor(
+                        currentExternalId,
+                        "native execute gate saw fallback for a previous external effect"
+                );
+            } else if (PostFxRuntimeState.isNativeRuntimeFallbackFor(currentExternalId)
+                    && PostFxRuntimeState.activeRuntimeBackendUsesPostChain()) {
+                return false;
+            }
         }
 
         if (PostFxRuntimeState.isActiveNativeRuntimeBackend()) {

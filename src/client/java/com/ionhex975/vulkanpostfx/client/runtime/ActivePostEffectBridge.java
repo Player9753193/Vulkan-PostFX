@@ -30,6 +30,12 @@ public final class ActivePostEffectBridge {
     }
 
     public static void refreshFromActivePack() {
+        // Native fallback is intentionally sticky only within a single active runtime effect.
+        // A pack refresh, pack switch, or re-materialization must start from a clean backend
+        // decision; otherwise a previous pack's native failure can incorrectly force every
+        // later pack through minecraft_postchain until the user restarts the game.
+        PostFxRuntimeState.clearNativeRuntimeFallback("active shader pack refresh started");
+
         ShaderPackContainer activePack = ActiveShaderPackManager.getActivePack();
         if (activePack == null) {
             activeSource = ActivePostEffectSource.NONE;

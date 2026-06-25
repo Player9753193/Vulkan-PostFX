@@ -39,6 +39,7 @@ public final class PostFxRuntimeState {
     private static volatile Identifier nativeRuntimeFallbackExternalPostEffectId;
     private static volatile String nativeRuntimeFallbackStage = "NONE";
     private static volatile String nativeRuntimeFallbackReason = "none";
+    private static volatile String nativeRuntimeFallbackClearReason = "none";
     private static volatile boolean pendingTransientAllocationCheck;
     private static volatile boolean pendingUserShaderPipelineCreate;
     private static volatile boolean skipPostChainThisFrame;
@@ -275,16 +276,54 @@ public final class PostFxRuntimeState {
         nativeRuntimeFallbackReason = reason != null && !reason.isBlank()
                 ? reason
                 : "native runtime unavailable; using minecraft_postchain";
+        nativeRuntimeFallbackClearReason = "none";
     }
 
     public static void clearNativeRuntimeFallback() {
+        clearNativeRuntimeFallback("unspecified");
+    }
+
+    public static void clearNativeRuntimeFallback(String reason) {
         nativeRuntimeFallbackExternalPostEffectId = null;
         nativeRuntimeFallbackStage = "NONE";
         nativeRuntimeFallbackReason = "none";
+        nativeRuntimeFallbackClearReason = reason != null && !reason.isBlank()
+                ? reason
+                : "unspecified";
+        skipPostChainThisFrame = false;
+        nativeDiagnosticDrawSucceededThisFrame = false;
+        skipPostChainReason = "native fallback cleared: " + nativeRuntimeFallbackClearReason;
     }
 
     public static boolean isNativeRuntimeFallbackActive() {
         return nativeRuntimeFallbackExternalPostEffectId != null;
+    }
+
+    public static boolean isNativeRuntimeFallbackFor(Identifier externalId) {
+        return nativeRuntimeFallbackExternalPostEffectId != null
+                && externalId != null
+                && nativeRuntimeFallbackExternalPostEffectId.equals(externalId);
+    }
+
+    public static boolean isNativeRuntimeFallbackStaleFor(Identifier currentExternalId) {
+        if (nativeRuntimeFallbackExternalPostEffectId == null) {
+            return false;
+        }
+        if (currentExternalId == null) {
+            return true;
+        }
+        return !nativeRuntimeFallbackExternalPostEffectId.equals(currentExternalId);
+    }
+
+    public static boolean clearStaleNativeRuntimeFallbackFor(Identifier currentExternalId, String reason) {
+        if (!isNativeRuntimeFallbackStaleFor(currentExternalId)) {
+            return false;
+        }
+        String fallbackId = String.valueOf(nativeRuntimeFallbackExternalPostEffectId);
+        clearNativeRuntimeFallback((reason != null && !reason.isBlank() ? reason : "stale native fallback")
+                + "; staleFallbackExternalPostEffectId=" + fallbackId
+                + "; currentExternalPostEffectId=" + currentExternalId);
+        return true;
     }
 
     public static Identifier getNativeRuntimeFallbackExternalPostEffectId() {
@@ -299,11 +338,17 @@ public final class PostFxRuntimeState {
         return nativeRuntimeFallbackReason;
     }
 
+    public static String getNativeRuntimeFallbackClearReason() {
+        return nativeRuntimeFallbackClearReason;
+    }
+
     public static String getNativeRuntimeFallbackSummary() {
         if (!isNativeRuntimeFallbackActive()) {
             return "none";
         }
-        return "stage=" + getNativeRuntimeFallbackStage() + ", reason=" + getNativeRuntimeFallbackReason();
+        return "effect=" + getNativeRuntimeFallbackExternalPostEffectId()
+                + ", stage=" + getNativeRuntimeFallbackStage()
+                + ", reason=" + getNativeRuntimeFallbackReason();
     }
 
     public static void markPendingTransientAllocationCheck() {

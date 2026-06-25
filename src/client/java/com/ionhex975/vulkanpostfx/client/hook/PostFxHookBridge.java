@@ -46,6 +46,7 @@ public final class PostFxHookBridge {
     private static int nativeDiagnosticFrameCounter;
     private static int nativeDiagnosticLastSummaryFrame = -1;
     private static boolean externalChainUnavailableLogged;
+    private static String lastExpectedNativePostChainFallbackReason = "";
     private static final int NATIVE_DIAGNOSTIC_SUMMARY_INTERVAL = 60;
 
     private PostFxHookBridge() {
@@ -149,7 +150,18 @@ public final class PostFxHookBridge {
 
         Identifier externalId = PostFxRuntimeState.getActiveExternalPostEffectId();
         if (externalId == null) {
+            PostFxRuntimeState.clearStaleNativeRuntimeFallbackFor(null,
+                    "world post effect begin without an active external effect");
             return;
+        }
+
+        if (PostFxRuntimeState.clearStaleNativeRuntimeFallbackFor(externalId,
+                "world post effect begin for a different active external effect")) {
+            VulkanPostFX.LOGGER.warn(
+                    "[{}] Cleared stale VPFX native fallback before world-stage execution. currentExternalPostEffectId={}",
+                    VulkanPostFX.MOD_ID,
+                    externalId
+            );
         }
 
         if (PostFxRuntimeState.isExternalPackMarkedFailed()) {
@@ -170,7 +182,7 @@ public final class PostFxHookBridge {
             }
 
             if (nativeResult != null && nativeResult.nativeSucceeded()) {
-                PostFxRuntimeState.clearNativeRuntimeFallback();
+                PostFxRuntimeState.clearNativeRuntimeFallback("native diagnostic draw succeeded for current effect");
                 PostFxRuntimeState.markWorldStageExternalEffectApplied();
                 PostFxRuntimeState.markSkipPostChainThisFrame(true,
                         "native diagnostic passthrough succeeded");
@@ -239,23 +251,44 @@ public final class PostFxHookBridge {
                     fallbackReason = "native diagnostic draw failed before producing a result";
                 }
 
-                PostFxRuntimeState.fallbackActiveRuntimeBackendToPostChain(
-                        externalId,
-                        VpfxBackendSelectionResult.STAGE_FRAME_EXECUTION,
-                        fallbackReason
-                );
-                PostFxRuntimeState.markSkipPostChainThisFrame(false,
-                        "native diagnostic did not succeed; continuing through minecraft_postchain");
-                PostFxRuntimeState.incrementNativeDiagnosticDrawFailure();
+                if (nativeResult != null && nativeResult.postChainFallbackExpected()) {
+                    PostFxRuntimeState.clearNativeRuntimeFallback(
+                            "native reported an expected per-frame PostChain fallback; backend remains eligible for retry"
+                    );
+                    PostFxRuntimeState.markSkipPostChainThisFrame(false,
+                            "native expected PostChain fallback this frame; continuing through minecraft_postchain");
+                    PostFxRuntimeState.incrementNativeDiagnosticDrawFailure();
 
-                VulkanPostFX.LOGGER.warn(
-                        "[{}] VPFX native direct runtime failed and was disabled for this active pack. "
-                                + "The pack remains active through minecraft_postchain fallback. externalPostEffectId={}, stage={}, reason={}",
-                        VulkanPostFX.MOD_ID,
-                        externalId,
-                        VpfxBackendSelectionResult.STAGE_FRAME_EXECUTION,
-                        fallbackReason
-                );
+                    if (!fallbackReason.equals(lastExpectedNativePostChainFallbackReason)) {
+                        lastExpectedNativePostChainFallbackReason = fallbackReason;
+                        VulkanPostFX.LOGGER.info(
+                                "[{}] VPFX native direct runtime requested a non-sticky PostChain fallback for this frame. "
+                                        + "The active pack remains eligible for native retry. externalPostEffectId={}, stage={}, reason={}",
+                                VulkanPostFX.MOD_ID,
+                                externalId,
+                                nativeResult.failureStage(),
+                                fallbackReason
+                        );
+                    }
+                } else {
+                    PostFxRuntimeState.fallbackActiveRuntimeBackendToPostChain(
+                            externalId,
+                            VpfxBackendSelectionResult.STAGE_FRAME_EXECUTION,
+                            fallbackReason
+                    );
+                    PostFxRuntimeState.markSkipPostChainThisFrame(false,
+                            "native diagnostic did not succeed; continuing through minecraft_postchain");
+                    PostFxRuntimeState.incrementNativeDiagnosticDrawFailure();
+
+                    VulkanPostFX.LOGGER.warn(
+                            "[{}] VPFX native direct runtime failed and was disabled for this active pack. "
+                                    + "The pack remains active through minecraft_postchain fallback. externalPostEffectId={}, stage={}, reason={}",
+                            VulkanPostFX.MOD_ID,
+                            externalId,
+                            VpfxBackendSelectionResult.STAGE_FRAME_EXECUTION,
+                            fallbackReason
+                    );
+                }
 
                 if (nativeResult != null) {
                     VulkanPostFX.LOGGER.info(

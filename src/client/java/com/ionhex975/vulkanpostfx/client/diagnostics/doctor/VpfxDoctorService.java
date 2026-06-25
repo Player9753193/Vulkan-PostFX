@@ -14,6 +14,10 @@ import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackScanIssue;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxNativePackDefinition;
+import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph.VpfxNativeRuntimeTextureResolver;
+import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph.VpfxNativeRuntimeTextureBindingResult;
+import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxPassInput;
+import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxPassDefinition;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxValidationMessage;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectBridge;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectSource;
@@ -49,6 +53,7 @@ public final class VpfxDoctorService {
         sections.add(sceneDepthSection());
         sections.add(shadowDepthSection());
         sections.add(runtimeTextureBusSection());
+        sections.add(nativeRuntimeTextureBindingSection());
         sections.add(coloredLightsSection());
         sections.add(coloredLightVolumeSection());
         sections.add(builtinsSection());
@@ -100,15 +105,28 @@ public final class VpfxDoctorService {
         checks.add(VpfxDoctorCheck.info("backend_is_native", "Backend is native", PostFxRuntimeState.isActiveNativeRuntimeBackend()));
         checks.add(VpfxDoctorCheck.info("backend_uses_postchain", "Backend uses PostChain", PostFxRuntimeState.activeRuntimeBackendUsesPostChain()));
 
+        Identifier activeExternal = PostFxRuntimeState.getActiveExternalPostEffectId();
         if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
-            checks.add(VpfxDoctorCheck.warn(
+            boolean staleFallback = PostFxRuntimeState.isNativeRuntimeFallbackStaleFor(activeExternal);
+            checks.add((staleFallback ? VpfxDoctorCheck.error(
+                    "native_fallback_stale",
+                    "Native fallback scope",
+                    String.valueOf(PostFxRuntimeState.getNativeRuntimeFallbackExternalPostEffectId()),
+                    "Fallback belongs to a different external post effect. Current external post effect is " + activeExternal
+            ) : VpfxDoctorCheck.warn(
                     "native_fallback",
                     "Native fallback",
                     PostFxRuntimeState.getNativeRuntimeFallbackStage(),
                     PostFxRuntimeState.getNativeRuntimeFallbackReason()
+            )));
+            checks.add(VpfxDoctorCheck.info(
+                    "native_fallback_effect",
+                    "Native fallback external post effect",
+                    String.valueOf(PostFxRuntimeState.getNativeRuntimeFallbackExternalPostEffectId())
             ));
         } else {
             checks.add(VpfxDoctorCheck.ok("native_fallback", "Native fallback", "none"));
+            checks.add(VpfxDoctorCheck.info("native_fallback_last_clear", "Native fallback last clear", PostFxRuntimeState.getNativeRuntimeFallbackClearReason()));
         }
 
         checks.add(VpfxDoctorCheck.info("native_draw_success", "Native draw success count", PostFxRuntimeState.nativeDiagnosticDrawSuccessCount()));
@@ -273,6 +291,91 @@ public final class VpfxDoctorService {
         }
         return new VpfxDoctorSection("Runtime Texture Bus", checks);
     }
+
+    private static VpfxDoctorSection nativeRuntimeTextureBindingSection() {
+        List<VpfxDoctorCheck> checks = new ArrayList<>();
+        Minecraft minecraft = Minecraft.getInstance();
+        ShaderPackContainer activePack = ActiveShaderPackManager.getActivePack();
+        String runtimeNamespace = RuntimeZipPackState.getRuntimeNamespace();
+
+        if (activePack == null || !activePack.isVpfxNativePack() || activePack.vpfxDefinition() == null) {
+            checks.add(VpfxDoctorCheck.info(
+                    "native_runtime_texture_binding",
+                    "Native runtime texture binding",
+                    "skipped",
+                    "No active VPFX native pack."
+            ));
+            return new VpfxDoctorSection("Native Runtime Texture Binding", checks);
+        }
+
+        VpfxNativePackDefinition definition = activePack.vpfxDefinition();
+        if (definition.getGraph() == null) {
+            checks.add(VpfxDoctorCheck.warn(
+                    "native_runtime_texture_binding",
+                    "Native runtime texture binding",
+                    "skipped",
+                    "Active VPFX definition has no graph."
+            ));
+            return new VpfxDoctorSection("Native Runtime Texture Binding", checks);
+        }
+
+        checks.add(VpfxDoctorCheck.info("native_runtime_texture_namespace", "Runtime namespace", runtimeNamespace == null || runtimeNamespace.isBlank() ? "none" : runtimeNamespace));
+
+        int textureInputCount = 0;
+        int passIndex = 0;
+        for (VpfxPassDefinition pass : definition.getGraph().getPasses()) {
+            String passId = pass.identityOrIndex(passIndex++);
+            for (VpfxPassInput input : pass.getInputs()) {
+                if (!input.isTextureInput()) {
+                    continue;
+                }
+
+                textureInputCount++;
+                String logicalName = input.getTexture();
+                VpfxNativeRuntimeTextureBindingResult result = VpfxNativeRuntimeTextureResolver.probe(
+                        minecraft,
+                        runtimeNamespace,
+                        logicalName
+                );
+                String label = "Pass " + passId + " texture " + logicalName;
+                if (result.available()) {
+                    checks.add(VpfxDoctorCheck.ok(
+                            "native_texture_" + textureInputCount,
+                            label,
+                            result.summary()
+                    ));
+                } else if (result.transientFailure()) {
+                    checks.add(VpfxDoctorCheck.warn(
+                            "native_texture_" + textureInputCount,
+                            label,
+                            result.summary(),
+                            "Native can retry this binding on a later frame without sticky fallback."
+                    ));
+                } else {
+                    checks.add(VpfxDoctorCheck.error(
+                            "native_texture_" + textureInputCount,
+                            label,
+                            result.summary(),
+                            "Native cannot bind this texture input until the descriptor/resource issue is fixed."
+                    ));
+                }
+            }
+        }
+
+        if (textureInputCount == 0) {
+            checks.add(VpfxDoctorCheck.ok(
+                    "native_runtime_texture_inputs",
+                    "Texture inputs in active graph",
+                    0,
+                    "Active graph does not use logical texture inputs."
+            ));
+        } else {
+            checks.add(VpfxDoctorCheck.info("native_runtime_texture_input_count", "Texture inputs in active graph", textureInputCount));
+        }
+
+        return new VpfxDoctorSection("Native Runtime Texture Binding", checks);
+    }
+
 
     private static VpfxDoctorSection coloredLightsSection() {
         List<VpfxDoctorCheck> checks = new ArrayList<>();

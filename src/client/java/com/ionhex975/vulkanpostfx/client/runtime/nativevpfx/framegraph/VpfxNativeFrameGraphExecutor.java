@@ -12,8 +12,6 @@ import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.graph.VpfxNativeGrap
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.graph.VpfxNativeGraphPlanner;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.graph.VpfxNativeInputBinding;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.graph.VpfxNativePassNode;
-import com.ionhex975.vulkanpostfx.client.runtime.texture.VpfxRuntimeTextureDescriptor;
-import com.ionhex975.vulkanpostfx.client.runtime.texture.VpfxRuntimeTextureRegistry;
 import com.ionhex975.vulkanpostfx.client.runtime.zip.RuntimeZipPackState;
 import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthProvider;
 import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthState;
@@ -25,7 +23,6 @@ import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
 
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -122,21 +119,27 @@ public final class VpfxNativeFrameGraphExecutor {
 
                     for (VpfxNativeInputBinding input : pass.inputs()) {
                         if (input.isTextureInput()) {
-                            VpfxRuntimeTextureDescriptor descriptor = VpfxRuntimeTextureRegistry.getTexture(
+                            VpfxNativeRuntimeTextureBindingResult textureBinding = VpfxNativeRuntimeTextureResolver.resolve(
+                                    minecraft,
                                     runtimeNamespace,
                                     input.textureName()
                             );
-                            if (descriptor == null) {
-                                throw new IllegalStateException(
-                                        "texture input is not registered for pass '" + pass.passId() + "': " + input
+                            if (!textureBinding.available()) {
+                                return expectedPostChainFallback(
+                                        "native runtime texture input unavailable for pass '"
+                                                + pass.passId()
+                                                + "': "
+                                                + textureBinding.summary(),
+                                        textureBinding.transientFailure()
+                                                ? VpfxNativeFailureStage.USER_PIPELINE_RESOLVE
+                                                : VpfxNativeFailureStage.NATIVE_DRAW_FAILED
                                 );
                             }
 
-                            GpuTextureView textureView = resolveRuntimeTextureView(minecraft, descriptor);
                             renderPass.bindTexture(
                                     input.glslSamplerName(),
-                                    textureView,
-                                    VpfxNativeSamplerResolver.forTexture(descriptor)
+                                    textureBinding.textureView(),
+                                    VpfxNativeSamplerResolver.forTexture(textureBinding.descriptor())
                             );
                             continue;
                         }
@@ -219,40 +222,6 @@ public final class VpfxNativeFrameGraphExecutor {
     }
 
 
-    private static GpuTextureView resolveRuntimeTextureView(
-            Minecraft minecraft,
-            VpfxRuntimeTextureDescriptor descriptor
-    ) {
-        Identifier textureId = parseIdentifier(descriptor.getLocationId());
-        GpuTextureView view = minecraft.getTextureManager()
-                .getTexture(textureId)
-                .getTextureView();
-
-        if (view == null) {
-            throw new IllegalStateException(
-                    "runtime texture has no texture view: logical="
-                            + descriptor.getLogicalName()
-                            + ", location="
-                            + descriptor.getLocationId()
-            );
-        }
-
-        return view;
-    }
-
-    private static Identifier parseIdentifier(String value) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("blank runtime texture location id");
-        }
-
-        int colon = value.indexOf(':');
-        if (colon <= 0 || colon == value.length() - 1) {
-            throw new IllegalArgumentException("runtime texture location id must be namespace:path, got " + value);
-        }
-
-        return Identifier.fromNamespaceAndPath(value.substring(0, colon), value.substring(colon + 1));
-    }
-
     private static VpfxNativeFrameTarget resolveOutputTarget(VpfxNativeTargetPool targetPool, VpfxNativePassNode pass) {
         if (pass.outputs().isEmpty()) {
             throw new IllegalStateException("pass has no output: " + pass.passId());
@@ -264,6 +233,21 @@ public final class VpfxNativeFrameGraphExecutor {
             throw new IllegalStateException("output target unavailable for pass '" + pass.passId() + "': " + targetId);
         }
         return target;
+    }
+
+    private static VpfxNativeExecutionResult expectedPostChainFallback(String message, VpfxNativeFailureStage stage) {
+        return VpfxNativeExecutionResult.builder()
+                .attempted(true)
+                .copySucceeded(true)
+                .userPipelineAttempted(true)
+                .userPipelineAvailable(false)
+                .actualPipeline("native framegraph")
+                .fallbackReason(message)
+                .pipelineFallbackReason(message)
+                .failureStage(stage)
+                .failureMessage(message)
+                .postChainFallbackExpected(true)
+                .build();
     }
 
     private static VpfxNativeExecutionResult failed(String message, VpfxNativeFailureStage stage) {

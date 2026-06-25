@@ -25,6 +25,8 @@ import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxPassInput;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxTargetDefinition;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxValidationMessage;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectBridge;
+import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph.VpfxNativeRuntimeTextureBindingResult;
+import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph.VpfxNativeRuntimeTextureResolver;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectSource;
 import com.ionhex975.vulkanpostfx.client.runtime.zip.ActiveZipRuntimeNamespace;
 import com.ionhex975.vulkanpostfx.client.runtime.texture.dynamic.VpfxRuntimeTextureBus;
@@ -72,6 +74,7 @@ public final class VpfxDiagnosticExportService {
             writer.addText("active-pack-validation.txt", activePackValidationText());
             writer.addText("invalid-packs.txt", invalidPacksText());
             writer.addText("runtime-texture-bus.txt", runtimeTextureBusText());
+            writer.addText("native-runtime-textures.txt", nativeRuntimeTexturesText());
             writer.addText("colored-lights.txt", coloredLightsText());
             writer.addText("colored-light-volume.txt", coloredLightVolumeText());
             writer.addText("system-info.txt", systemInfoText(gameDir));
@@ -113,6 +116,7 @@ public final class VpfxDiagnosticExportService {
                 - active-pack-validation.txt: active pack validation messages.
                 - invalid-packs.txt: scan-time invalid pack diagnostics.
                 - runtime-texture-bus.txt: VPFX runtime texture bus handles.
+                - native-runtime-textures.txt: native texture binding readiness for active graph texture inputs.
                 - colored-lights.txt: CPU-side colored light collector snapshot.
                 - colored-light-volume.txt: CPU-built colored light volume atlas state.
                 - system-info.txt: Java, OS, Fabric, Minecraft, and VPFX environment.
@@ -153,6 +157,8 @@ public final class VpfxDiagnosticExportService {
         sb.append("nativeRuntimeFallbackExternalPostEffectId: ").append(id(PostFxRuntimeState.getNativeRuntimeFallbackExternalPostEffectId())).append('\n');
         sb.append("nativeRuntimeFallbackStage: ").append(safe(PostFxRuntimeState.getNativeRuntimeFallbackStage())).append('\n');
         sb.append("nativeRuntimeFallbackReason: ").append(safe(PostFxRuntimeState.getNativeRuntimeFallbackReason())).append('\n');
+        sb.append("nativeRuntimeFallbackClearReason: ").append(safe(PostFxRuntimeState.getNativeRuntimeFallbackClearReason())).append('\n');
+        sb.append("nativeRuntimeFallbackStaleForActiveEffect: ").append(PostFxRuntimeState.isNativeRuntimeFallbackStaleFor(PostFxRuntimeState.getActiveExternalPostEffectId())).append('\n');
         sb.append("nativeDrawSuccessCount: ").append(PostFxRuntimeState.nativeDiagnosticDrawSuccessCount()).append('\n');
         sb.append("nativeDrawFailureCount: ").append(PostFxRuntimeState.nativeDiagnosticDrawFailureCount()).append('\n');
         sb.append("postChainSkippedFrameCount: ").append(PostFxRuntimeState.postChainSkippedFrameCount()).append('\n');
@@ -200,6 +206,8 @@ public final class VpfxDiagnosticExportService {
 
         appendRuntimeTextureBus(sb);
         sb.append('\n');
+        appendNativeRuntimeTextures(sb);
+        sb.append('\n');
         appendColoredLights(sb);
         sb.append('\n');
         appendColoredLightVolume(sb);
@@ -219,6 +227,14 @@ public final class VpfxDiagnosticExportService {
         appendRuntimeTextureBus(sb);
         return sb.toString();
     }
+
+    private static String nativeRuntimeTexturesText() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== VPFX Native Runtime Texture Binding ===\n");
+        appendNativeRuntimeTextures(sb);
+        return sb.toString();
+    }
+
 
     private static String coloredLightsText() {
         StringBuilder sb = new StringBuilder();
@@ -423,6 +439,8 @@ public final class VpfxDiagnosticExportService {
 
         appendRuntimeTextureBus(sb);
         sb.append('\n');
+        appendNativeRuntimeTextures(sb);
+        sb.append('\n');
         appendColoredLights(sb);
         sb.append('\n');
 
@@ -459,6 +477,49 @@ public final class VpfxDiagnosticExportService {
                     .append('\n');
         }
     }
+
+    private static void appendNativeRuntimeTextures(StringBuilder sb) {
+        sb.append("--- Native Runtime Texture Binding ---\n");
+        Minecraft minecraft = Minecraft.getInstance();
+        ShaderPackContainer activePack = ActiveShaderPackManager.getActivePack();
+        String runtimeNamespace = RuntimeZipPackState.getRuntimeNamespace();
+        sb.append("runtimeNamespace: ").append(safe(runtimeNamespace)).append('\n');
+
+        if (activePack == null || !activePack.isVpfxNativePack() || activePack.vpfxDefinition() == null || activePack.vpfxDefinition().getGraph() == null) {
+            sb.append("activeGraphTextureInputs: skipped\n");
+            return;
+        }
+
+        int textureInputCount = 0;
+        int passIndex = 0;
+        for (VpfxPassDefinition pass : activePack.vpfxDefinition().getGraph().getPasses()) {
+            String passId = pass.identityOrIndex(passIndex++);
+            for (VpfxPassInput input : pass.getInputs()) {
+                if (!input.isTextureInput()) {
+                    continue;
+                }
+                textureInputCount++;
+                VpfxNativeRuntimeTextureBindingResult result = VpfxNativeRuntimeTextureResolver.probe(
+                        minecraft,
+                        runtimeNamespace,
+                        input.getTexture()
+                );
+                sb.append("textureInput[").append(textureInputCount).append("]: ")
+                        .append("pass=").append(passId)
+                        .append(", sampler=").append(safe(input.getSamplerName()))
+                        .append(", texture=").append(safe(input.getTexture()))
+                        .append(", ").append(result.summary())
+                        .append('\n');
+            }
+        }
+
+        if (textureInputCount == 0) {
+            sb.append("activeGraphTextureInputs: 0\n");
+        } else {
+            sb.append("activeGraphTextureInputs: ").append(textureInputCount).append('\n');
+        }
+    }
+
 
     private static void appendColoredLights(StringBuilder sb) {
         VpfxColoredLightSnapshot snapshot = VpfxColoredLightCollector.currentSnapshot();

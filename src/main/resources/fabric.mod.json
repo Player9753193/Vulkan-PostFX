@@ -8,7 +8,9 @@
 		"IonHex975"
 	],
 	"contact": {
-		"sources": "https://github.com/IonHex975/vulkanpostfx"
+		"homepage": "https://modrinth.com/mod/vulkan-postfx",
+		"sources": "https://github.com/Player9753193/Vulkan-PostFX",
+		"issues": "https://github.com/Player9753193/Vulkan-PostFX/issues"
 	},
 	"license": "Vulkan PostFX License v1.2",
 	"icon": "assets/vulkanpostfx/icon.png",

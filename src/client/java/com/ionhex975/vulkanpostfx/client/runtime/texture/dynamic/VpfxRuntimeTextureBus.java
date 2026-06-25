@@ -126,10 +126,29 @@ public final class VpfxRuntimeTextureBus {
 
     public static synchronized boolean isRuntimeBusTexture(String logicalName) {
         bootstrapDefaults();
+        return isNativeBindableRuntimeTexture(logicalName);
+    }
+
+    public static synchronized boolean isNativeBindableRuntimeTexture(String logicalName) {
+        bootstrapDefaults();
         // Only colored_light_volume is currently exposed as a regular VPFX
         // texture input. scene_depth/shadow_depth remain target inputs, and
         // material_mask/normal_buffer are future placeholders.
         return COLORED_LIGHT_VOLUME.equals(logicalName) && HANDLES.containsKey(logicalName);
+    }
+
+    public static synchronized String nativeBindingSummary(String logicalName) {
+        bootstrapDefaults();
+        VpfxRuntimeTextureHandle handle = HANDLES.get(logicalName);
+        if (handle == null) {
+            return "not registered";
+        }
+        return "nativeBindable=" + isNativeBindableRuntimeTexture(logicalName)
+                + ", ready=" + handle.ready()
+                + ", id=" + (handle.location() == null ? "none" : handle.location())
+                + ", size=" + handle.sizeString()
+                + ", frame=" + handle.frameEpoch()
+                + ", reason=" + handle.reason();
     }
 
     public static synchronized VpfxRuntimeTextureDescriptor toRuntimeDescriptor(String logicalName) {
