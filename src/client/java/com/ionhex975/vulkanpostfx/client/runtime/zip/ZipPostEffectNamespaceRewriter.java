@@ -117,9 +117,11 @@ public final class ZipPostEffectNamespaceRewriter {
             return;
         }
 
-        // 15 * vec4 + 15 * mat4 = 75 vec4 slots。
+        // 13 * vec4 + 15 * mat4 = 73 vec4 slots。
+        // Held-light 复用旧布局里的 spare .w 分量，不能在这里扩到 75，
+        // 否则 native direct backend 的 VpfxBuiltins layout 会和既有 pipeline 不一致。
         // 这里的 JSON uniforms 只负责让 PostPass 为 VpfxBuiltins 分到足够大的 GPU buffer。
-        final int vec4SlotCount = 75;
+        final int vec4SlotCount = 73;
 
         JsonArray blockValues = new JsonArray();
 

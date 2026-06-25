@@ -8,12 +8,10 @@ out vec4 fragColor;
 void main() {
     vec4 color = texture(InSampler, texCoord);
 
-    vec3 glowColor = vpfx_applyHeldLightGlow(texCoord, color.rgb);
+    // v2: make the fake held light visibly change brightness, not only tint.
+    // The implementation still remains strictly screen-space: no world light
+    // propagation, no chunk/entity shader injection, no server-side state.
+    vec3 result = vpfx_applyHeldLightGlow(texCoord, color.rgb);
 
-    // Add a very small global lift while held light is active so the effect is
-    // visible in dark caves without washing out bright scenes.
-    float active = vpfx_hasHeldLight() ? 1.0 : 0.0;
-    vec3 lifted = mix(glowColor, max(glowColor, glowColor + vpfx_HeldLightColor * 0.025), active);
-
-    fragColor = vec4(clamp(lifted, 0.0, 1.0), color.a);
+    fragColor = vec4(clamp(result, 0.0, 1.0), color.a);
 }
