@@ -1,0 +1,18 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "colored_light_volume_debug",
+      "debug_label": "Colored Light Volume Debug",
+      "vertex_shader": "vpfx_colored_light_volume_debug:composite/final",
+      "fragment_shader": "vpfx_colored_light_volume_debug:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "ColoredLightVolume",
+          "texture": "colored_light_volume"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

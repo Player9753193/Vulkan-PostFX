@@ -1,0 +1,19 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "depth_debug",
+      "debug_label": "Scene Depth Debug",
+      "vertex_shader": "vpfx_depth_debug:composite/final",
+      "fragment_shader": "vpfx_depth_debug:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "Depth",
+          "target": "vulkanpostfx:scene_depth",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

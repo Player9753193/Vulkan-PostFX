@@ -1,5 +1,7 @@
 package com.ionhex975.vulkanpostfx.client.pack.vpfx;
 
+import com.ionhex975.vulkanpostfx.client.runtime.texture.dynamic.VpfxRuntimeTextureBus;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -125,7 +127,8 @@ public final class VpfxGraphValidator {
                 }
 
                 if (hasTexture) {
-                    if (!declaredTextures.containsKey(input.getTexture())) {
+                    if (!declaredTextures.containsKey(input.getTexture())
+                            && !VpfxRuntimeTextureBus.isRuntimeBusTexture(input.getTexture())) {
                         messages.add(fatal("G013", inputPath + ".texture", "Input texture not declared: " + input.getTexture()));
                     }
 

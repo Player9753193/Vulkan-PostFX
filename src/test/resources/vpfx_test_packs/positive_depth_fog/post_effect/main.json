@@ -1,0 +1,23 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "depth_fog",
+      "debug_label": "Depth Fog",
+      "vertex_shader": "vpfx_depth_fog:composite/final",
+      "fragment_shader": "vpfx_depth_fog:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:scene_color"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "vulkanpostfx:scene_depth",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

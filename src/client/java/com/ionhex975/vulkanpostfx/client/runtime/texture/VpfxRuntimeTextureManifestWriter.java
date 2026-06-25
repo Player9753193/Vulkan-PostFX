@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxTextureFilter;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxTextureManifestEntry;
+import com.ionhex975.vulkanpostfx.client.runtime.texture.dynamic.VpfxRuntimeTextureBus;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -54,6 +55,14 @@ public final class VpfxRuntimeTextureManifestWriter {
                         texture.getWrap()
                 ));
             }
+        }
+
+        // Runtime data textures such as vulkanpostfx:colored_light_volume are not
+        // stored inside the ZIP. They are registered with Minecraft's texture manager
+        // at runtime, but they still need manifest descriptors so PostChain/native
+        // texture inputs can resolve logical names to stable texture identifiers.
+        for (VpfxRuntimeTextureDescriptor descriptor : VpfxRuntimeTextureBus.runtimeDescriptors()) {
+            result.putIfAbsent(descriptor.getLogicalName(), descriptor);
         }
 
         return new VpfxRuntimeTextureManifest(runtimeNamespace, result);

@@ -2,6 +2,7 @@ package com.ionhex975.vulkanpostfx.client.runtime.posteffect;
 
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackResourceIndex;
+import com.ionhex975.vulkanpostfx.client.runtime.texture.dynamic.VpfxRuntimeTextureBus;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -121,7 +122,8 @@ public final class ZipShaderReferenceValidator {
         }
 
         Map<String, ?> textures = activePack.vpfxDefinition().getManifest().getTextures();
-        if (!textures.containsKey(logicalTextureName)) {
+        if (!textures.containsKey(logicalTextureName)
+                && !VpfxRuntimeTextureBus.isRuntimeBusTexture(logicalTextureName)) {
             missing.add(logicalTextureName + " [undeclared texture logical name]");
         }
     }

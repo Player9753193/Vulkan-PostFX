@@ -4,6 +4,7 @@ import com.ionhex975.vulkanpostfx.VulkanPostFX;
 import com.ionhex975.vulkanpostfx.client.diagnostics.VpfxFailureDiagnostics;
 import com.ionhex975.vulkanpostfx.client.effect.PostFxEffectDefinition;
 import com.ionhex975.vulkanpostfx.client.effect.PostFxEffectRegistry;
+import com.ionhex975.vulkanpostfx.client.light.colored.volume.VpfxColoredLightVolumeAtlas;
 import com.ionhex975.vulkanpostfx.client.mixin.GameRendererAccessor;
 import com.ionhex975.vulkanpostfx.client.mixin.PostChainAccessor;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxCapabilityResolver;
@@ -107,6 +108,10 @@ public final class PostFxHookBridge {
 
     public static void onWorldRenderTail(Minecraft minecraft) {
         SceneDepthCaptureTargets.get().captureFromMainTarget(minecraft);
+
+        if (PostFxRuntimeState.isDebugEffectEnabled()) {
+            VpfxColoredLightVolumeAtlas.update(minecraft, false);
+        }
 
         if (PostFxRuntimeState.consumePendingTransientAllocationCheck()) {
             VpfxNativeTransientTargetDryRun.runOnRenderThread(minecraft);

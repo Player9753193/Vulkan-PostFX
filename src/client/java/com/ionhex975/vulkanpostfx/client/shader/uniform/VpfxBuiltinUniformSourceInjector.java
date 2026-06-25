@@ -90,6 +90,81 @@ layout(std140) uniform VpfxBuiltins {
 #define vpfx_HeldLightRadius        (vpfx_FogDistanceInfoB.w)
 #define vpfx_HeldLightEnabled       (vpfx_CelestialAngleInfo.w > 0.5)
 
+
+// Colored-light volume atlas constants. The atlas is CPU-built by
+// VpfxColoredLightVolumeAtlas and packed as 16 Y slices in a 4x4 2D texture.
+// These are compile-time constants so the legacy 13-vec4 VpfxBuiltins layout
+// remains stable for the native backend.
+#define vpfx_ColoredLightVolumeSize        vec3(32.0, 16.0, 32.0)
+#define vpfx_ColoredLightVolumeAtlasSize   vec2(128.0, 128.0)
+#define vpfx_ColoredLightVolumeTilesPerRow 4.0
+#define vpfx_ColoredLightVolumeVoxelSize   1.5
+
+vec3 vpfx_ColoredLightVolumeOrigin() {
+    // The CPU atlas is centered on player.blockPosition(). The shader only has
+    // camera position, so approximate the player block from the eye position.
+    // This keeps the v0 raymarch path data-driven without expanding the UBO.
+    vec3 approxPlayerBlock = floor(vpfx_CameraPos - vec3(0.0, 1.0, 0.0));
+    return approxPlayerBlock + vec3(0.5, 1.0, 0.5)
+        - (vpfx_ColoredLightVolumeSize * vpfx_ColoredLightVolumeVoxelSize) * 0.5;
+}
+
+vec2 vpfx_ColoredLightVolumeAtlasUv(vec3 volumeCoord) {
+    vec3 clamped = clamp(volumeCoord, vec3(0.0), vpfx_ColoredLightVolumeSize - vec3(1.001));
+    float sliceY = floor(clamped.y);
+    float tileX = mod(sliceY, vpfx_ColoredLightVolumeTilesPerRow);
+    float tileY = floor(sliceY / vpfx_ColoredLightVolumeTilesPerRow);
+
+    vec2 texel = vec2(
+        tileX * vpfx_ColoredLightVolumeSize.x + clamped.x,
+        tileY * vpfx_ColoredLightVolumeSize.z + clamped.z
+    ) + vec2(0.5);
+    return texel / vpfx_ColoredLightVolumeAtlasSize;
+}
+
+vec3 vpfx_DecodeColoredLightVolume(vec3 encoded) {
+    // CPU side uses 1.0 - exp(-energy * 0.72) for RGBA8 storage.
+    vec3 safeEncoded = clamp(encoded, vec3(0.0), vec3(0.995));
+    return -log(max(vec3(0.0001), vec3(1.0) - safeEncoded)) / 0.72;
+}
+
+vec3 vpfx_SampleColoredLightVolumeNearest(sampler2D atlasSampler, vec3 worldPos) {
+    vec3 local = (worldPos - vpfx_ColoredLightVolumeOrigin()) / vpfx_ColoredLightVolumeVoxelSize;
+    if (any(lessThan(local, vec3(0.0))) || any(greaterThanEqual(local, vpfx_ColoredLightVolumeSize))) {
+        return vec3(0.0);
+    }
+
+    vec4 sample = texture(atlasSampler, vpfx_ColoredLightVolumeAtlasUv(floor(local)));
+    return vpfx_DecodeColoredLightVolume(sample.rgb) * max(sample.a, 0.08);
+}
+
+vec3 vpfx_SampleColoredLightVolumeTrilinear(sampler2D atlasSampler, vec3 worldPos) {
+    vec3 local = (worldPos - vpfx_ColoredLightVolumeOrigin()) / vpfx_ColoredLightVolumeVoxelSize;
+    if (any(lessThan(local, vec3(0.0))) || any(greaterThanEqual(local, vpfx_ColoredLightVolumeSize - vec3(1.0)))) {
+        return vec3(0.0);
+    }
+
+    vec3 base = floor(local);
+    vec3 f = fract(local);
+
+    vec3 c000 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(0.0, 0.0, 0.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c100 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(1.0, 0.0, 0.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c010 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(0.0, 1.0, 0.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c110 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(1.0, 1.0, 0.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c001 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(0.0, 0.0, 1.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c101 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(1.0, 0.0, 1.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c011 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(0.0, 1.0, 1.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+    vec3 c111 = vpfx_SampleColoredLightVolumeNearest(atlasSampler, vpfx_ColoredLightVolumeOrigin() + (base + vec3(1.0, 1.0, 1.0) + vec3(0.5)) * vpfx_ColoredLightVolumeVoxelSize);
+
+    vec3 c00 = mix(c000, c100, f.x);
+    vec3 c10 = mix(c010, c110, f.x);
+    vec3 c01 = mix(c001, c101, f.x);
+    vec3 c11 = mix(c011, c111, f.x);
+    vec3 c0 = mix(c00, c10, f.y);
+    vec3 c1 = mix(c01, c11, f.y);
+    return mix(c0, c1, f.z);
+}
+
 #define vpfx_ProjectionMatrix            (gbufferProjection)
 #define vpfx_PreviousProjectionMatrix    (gbufferPreviousProjection)
 #define vpfx_ViewRotationMatrix          (gbufferModelView)

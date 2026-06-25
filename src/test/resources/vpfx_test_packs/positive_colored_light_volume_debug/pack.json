@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "pack_id": "vpfx_colored_light_volume_debug",
+  "name": "VPFX Colored Light Volume Debug",
+  "version": "1.0.0",
+  "author": "VPFX Team",
+  "description": "Official VPFX colored-light volume atlas validation pack. Displays the CPU-built colored_light_volume runtime texture.",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": false,
+    "scene_depth": false,
+    "shadow_depth": false,
+    "custom_targets": false,
+    "compute": false
+  }
+}

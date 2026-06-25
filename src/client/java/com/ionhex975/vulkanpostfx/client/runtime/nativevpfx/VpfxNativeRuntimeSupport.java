@@ -8,6 +8,7 @@ import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxPassDefinition;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxPassInput;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxTargetDefinition;
 import com.ionhex975.vulkanpostfx.client.runtime.vpfx.VpfxPostChainBackend;
+import com.ionhex975.vulkanpostfx.client.runtime.texture.dynamic.VpfxRuntimeTextureBus;
 import com.ionhex975.vulkanpostfx.client.runtime.vpfx.VpfxRuntimeBackend;
 import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
 
@@ -164,7 +165,8 @@ public final class VpfxNativeRuntimeSupport {
                     if (texture == null || texture.isBlank()) {
                         return VpfxNativeRuntimeSupportResult.unsupported("native framegraph unsupported: blank texture input");
                     }
-                    if (manifest == null || !manifest.getTextures().containsKey(texture)) {
+                    if ((manifest == null || !manifest.getTextures().containsKey(texture))
+                            && !VpfxRuntimeTextureBus.isRuntimeBusTexture(texture)) {
                         return VpfxNativeRuntimeSupportResult.unsupported("native framegraph unsupported: undeclared texture input: " + texture);
                     }
                     continue;

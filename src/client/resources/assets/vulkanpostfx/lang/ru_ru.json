@@ -179,5 +179,6 @@
   "command.vulkanpostfx.export_diagnostics.failed": "Не удалось экспортировать диагностику VPFX: %s",
   "vulkanpostfx.hud.scene_depth": "Глубина сцены: %s",
   "vulkanpostfx.hud.shadow_depth": "Глубина теней: %s",
-  "vulkanpostfx.hud.colored_lights": "Цветные источники света: %s"
+  "vulkanpostfx.hud.colored_lights": "Цветные источники света: %s",
+  "vulkanpostfx.hud.colored_light_volume": "Цветовой объём: %s"
 }

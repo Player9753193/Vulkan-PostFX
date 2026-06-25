@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "pack_id": "vpfx_shadow_depth_debug",
+  "name": "VPFX Shadow Depth Debug",
+  "version": "1.0.0",
+  "author": "VPFX Team",
+  "description": "Official VPFX shadow-depth validation pack. Displays the VPFX shadow depth map as grayscale.",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": false,
+    "scene_depth": false,
+    "shadow_depth": true,
+    "custom_targets": false,
+    "compute": false
+  },
+  "targets": {
+    "shadow_depth": "vulkanpostfx:shadow_depth"
+  }
+}

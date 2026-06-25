@@ -277,6 +277,19 @@ public final class ZipPackMaterializer {
 
         try (ZipFile zipFile = new ZipFile(activePack.sourcePath().toFile())) {
             for (VpfxRuntimeTextureDescriptor descriptor : runtimeTextureManifest.getTextures().values()) {
+                if (descriptor.getSourceZipPath() != null
+                        && descriptor.getSourceZipPath().startsWith("runtime-bus:")) {
+                    VulkanPostFX.LOGGER.info(
+                            "[{}] Skipped runtime-bus texture materialization: logical={}, location={}, size={}x{}",
+                            VulkanPostFX.MOD_ID,
+                            descriptor.getLogicalName(),
+                            descriptor.getLocationId(),
+                            descriptor.getWidth(),
+                            descriptor.getHeight()
+                    );
+                    continue;
+                }
+
                 Path outPath = runtimeRoot
                         .resolve("assets")
                         .resolve(runtimeTextureManifest.getRuntimeNamespace())

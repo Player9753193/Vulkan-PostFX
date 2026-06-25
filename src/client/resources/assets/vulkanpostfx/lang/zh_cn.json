@@ -179,5 +179,6 @@
   "command.vulkanpostfx.export_diagnostics.failed": "VPFX 诊断包导出失败：%s",
   "vulkanpostfx.hud.scene_depth": "场景深度：%s",
   "vulkanpostfx.hud.shadow_depth": "阴影深度：%s",
-  "vulkanpostfx.hud.colored_lights": "彩色光源：%s"
+  "vulkanpostfx.hud.colored_lights": "彩色光源：%s",
+  "vulkanpostfx.hud.colored_light_volume": "彩色光场：%s"
 }

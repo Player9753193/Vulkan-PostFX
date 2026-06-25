@@ -179,5 +179,6 @@
   "command.vulkanpostfx.export_diagnostics.failed": "VPFX diagnostic export failed: %s",
   "vulkanpostfx.hud.scene_depth": "Scene depth: %s",
   "vulkanpostfx.hud.shadow_depth": "Shadow depth: %s",
-  "vulkanpostfx.hud.colored_lights": "Colored lights: %s"
+  "vulkanpostfx.hud.colored_lights": "Colored lights: %s",
+  "vulkanpostfx.hud.colored_light_volume": "Colored volume: %s"
 }

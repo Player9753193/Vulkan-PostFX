@@ -6,6 +6,8 @@ import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightInfo;
 import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightProvider;
 import com.ionhex975.vulkanpostfx.client.light.colored.VpfxColoredLightCollector;
 import com.ionhex975.vulkanpostfx.client.light.colored.VpfxColoredLightSnapshot;
+import com.ionhex975.vulkanpostfx.client.light.colored.volume.VpfxColoredLightVolumeAtlas;
+import com.ionhex975.vulkanpostfx.client.light.colored.volume.VpfxColoredLightVolumeState;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectBridge;

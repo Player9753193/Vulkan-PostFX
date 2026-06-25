@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "pack_id": "vpfx_depth_fog",
+  "name": "VPFX Depth Fog",
+  "version": "1.0.0",
+  "author": "VPFX Team",
+  "description": "Official VPFX scene-depth fog example. Uses scene_color + scene_depth to fog distant pixels.",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": true,
+    "scene_depth": true,
+    "shadow_depth": false,
+    "custom_targets": false,
+    "compute": false
+  }
+}

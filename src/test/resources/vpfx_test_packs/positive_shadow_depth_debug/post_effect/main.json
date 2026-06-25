@@ -1,0 +1,19 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "shadow_depth_debug",
+      "debug_label": "Shadow Depth Debug",
+      "vertex_shader": "vpfx_shadow_depth_debug:composite/final",
+      "fragment_shader": "vpfx_shadow_depth_debug:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "ShadowDepth",
+          "target": "vulkanpostfx:shadow_depth",
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

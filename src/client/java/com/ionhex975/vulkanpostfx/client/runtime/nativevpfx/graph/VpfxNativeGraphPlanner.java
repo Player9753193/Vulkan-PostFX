@@ -10,6 +10,7 @@ import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxTargetDefinition;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeFailureStage;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativePipelineKey;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxPassType;
+import com.ionhex975.vulkanpostfx.client.runtime.texture.dynamic.VpfxRuntimeTextureBus;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -113,7 +114,8 @@ public final class VpfxNativeGraphPlanner {
                     if (textureName == null || textureName.isBlank()) {
                         return unsupported("texture input has blank logical name", passId);
                     }
-                    if (!vpfxDef.getManifest().getTextures().containsKey(textureName)) {
+                    if (!vpfxDef.getManifest().getTextures().containsKey(textureName)
+                            && !VpfxRuntimeTextureBus.isRuntimeBusTexture(textureName)) {
                         return unsupported("texture input is not declared in pack manifest: " + textureName, passId);
                     }
                     binding = VpfxNativeInputBinding.texture(samplerName, textureName);
