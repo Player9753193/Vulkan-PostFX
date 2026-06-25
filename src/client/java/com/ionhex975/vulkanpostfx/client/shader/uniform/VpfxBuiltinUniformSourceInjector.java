@@ -31,8 +31,6 @@ layout(std140) uniform VpfxBuiltins {
     vec4 vpfx_MoonPositionInfo;
     vec4 vpfx_ShadowLightPositionInfo;
     vec4 vpfx_UpPositionInfo;
-    vec4 vpfx_HeldLightColorInfo;
-    vec4 vpfx_HeldLightParamsInfo;
     mat4 gbufferProjection;
     mat4 vpfx_InverseProjectionMatrix;
     mat4 gbufferPreviousProjection;
@@ -85,10 +83,12 @@ layout(std140) uniform VpfxBuiltins {
 #define vpfx_ShadowLightPosition    (vpfx_ShadowLightPositionInfo.xyz)
 #define vpfx_UpPosition             (vpfx_UpPositionInfo.xyz)
 
-#define vpfx_HeldLightColor         (vpfx_HeldLightColorInfo.rgb)
-#define vpfx_HeldLightIntensity     (vpfx_HeldLightColorInfo.a)
-#define vpfx_HeldLightRadius        (vpfx_HeldLightParamsInfo.x)
-#define vpfx_HeldLightEnabled       (vpfx_HeldLightParamsInfo.y > 0.5)
+// Held-light values reuse spare .w lanes in the pre-existing 13-vec4 layout.
+// Do not add new vec4 fields here unless all native and PostChain UBO paths are migrated together.
+#define vpfx_HeldLightColor         (vec3(vpfx_SunPositionInfo.w, vpfx_MoonPositionInfo.w, vpfx_ShadowLightPositionInfo.w))
+#define vpfx_HeldLightIntensity     (vpfx_UpPositionInfo.w)
+#define vpfx_HeldLightRadius        (vpfx_FogDistanceInfoB.w)
+#define vpfx_HeldLightEnabled       (vpfx_CelestialAngleInfo.w > 0.5)
 
 #define vpfx_ProjectionMatrix            (gbufferProjection)
 #define vpfx_PreviousProjectionMatrix    (gbufferPreviousProjection)
@@ -123,10 +123,21 @@ bool vpfx_hasHeldLight() {
     return vpfx_HeldLightEnabled && vpfx_HeldLightIntensity > 0.001;
 }
 
-float vpfx_HeldLightRadialMask(vec2 uv, float innerRadius, float outerRadius) {
-    vec2 p = uv * 2.0 - 1.0;
-    p.x *= vpfx_ViewSize.x * vpfx_InvViewSize.y;
-    return 1.0 - smoothstep(innerRadius, outerRadius, length(p));
+float vpfx_HeldLightRadialMask(vec2 uv, float radius) {
+    // The held item is rendered near the lower-right area of the screen, so the
+    // fake light should originate from that direction rather than from the
+    // exact screen center. This makes the effect read as a hand-held lamp.
+    vec2 center = vec2(0.68, 0.72);
+
+    float aspect = max(vpfx_ViewSize.x, 1.0) / max(vpfx_ViewSize.y, 1.0);
+    vec2 p = uv;
+    vec2 c = center;
+    p.x *= aspect;
+    c.x *= aspect;
+
+    float dist = distance(p, c);
+    float outerRadius = max(0.42, radius * 0.95);
+    return 1.0 - smoothstep(0.04, outerRadius, dist);
 }
 
 vec3 vpfx_applyHeldLightGlow(vec2 uv, vec3 color) {
@@ -134,15 +145,43 @@ vec3 vpfx_applyHeldLightGlow(vec2 uv, vec3 color) {
         return color;
     }
 
-    float radius = max(vpfx_HeldLightRadius, 0.001);
-    float glow = vpfx_HeldLightRadialMask(uv, 0.05 * radius, 1.35 * radius);
-    glow *= vpfx_HeldLightIntensity;
-
     vec3 lightColor = vpfx_HeldLightColor;
-    float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    float darkBoost = 1.0 - smoothstep(0.18, 0.82, luminance);
+    float intensity = clamp(vpfx_HeldLightIntensity, 0.0, 4.0);
+    float radius = max(vpfx_HeldLightRadius, 0.001);
 
-    return color + lightColor * glow * mix(0.045, 0.18, darkBoost);
+    float radial = vpfx_HeldLightRadialMask(uv, radius);
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+
+    // Keep bright vanilla-lit areas from washing out, while making unlit areas
+    // visibly brighter. The old v1 shader mostly tinted the frame; this v2 path
+    // actually lifts exposure in dark and mid-tone regions.
+    float darkMask = 1.0 - smoothstep(0.08, 0.86, luma);
+    darkMask = pow(clamp(darkMask, 0.0, 1.0), 0.70);
+
+    float localStrength = radial * intensity;
+    float ambientStrength = darkMask * intensity;
+
+    // Add both a local cone-like lift from the hand and a softer ambient lift
+    // so the held light remains visible even when the held item is partly off
+    // screen. The values are intentionally artistic rather than physically exact.
+    vec3 additive = lightColor * (
+            localStrength * (0.10 + 0.62 * darkMask)
+          + ambientStrength * 0.16
+    );
+
+    vec3 lifted = color + additive;
+
+    // A mild exposure curve makes dark terrain brighten more naturally than a
+    // plain linear add, while still preserving highlights through clamping.
+    float exposureAmount = clamp((localStrength * darkMask * 0.42) + (ambientStrength * 0.12), 0.0, 0.70);
+    vec3 exposed = vec3(1.0) - exp(-lifted * 1.35);
+    lifted = mix(lifted, exposed, exposureAmount);
+
+    // Keep a subtle color identity for soul/copper/redstone light sources.
+    float tintAmount = clamp((localStrength + ambientStrength) * 0.10, 0.0, 0.22);
+    lifted = mix(lifted, lifted * mix(vec3(1.0), lightColor, 0.25), tintAmount);
+
+    return clamp(lifted, 0.0, 1.0);
 }
 
 float vpfx_InternalSafeSignedDenominator(float value) {

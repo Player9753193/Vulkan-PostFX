@@ -21,14 +21,15 @@ import java.nio.ByteBuffer;
 /**
  * VpfxBuiltins UBO writer。
  * 完整 GLSL 块定义见 {@link VpfxBuiltinUniformSourceInjector}。
- * 布局：15 × vec4 + 15 × mat4 = 1200 bytes (std140)。
+ * 布局：13 × vec4 + 15 × mat4 = 1168 bytes (std140)。
+ *
+ * Held-light 数据故意复用旧布局中的 spare .w 分量，而不是新增 vec4 slot。
+ * 这样可以保持 native direct backend 的 VpfxBuiltins UBO layout 稳定，避免旧 native pipeline 因 block size 改变而失效。
  */
 public final class VpfxBuiltinUniformBuffer {
     public static final String BLOCK_NAME = "VpfxBuiltins";
 
     public static final int UBO_SIZE = new Std140SizeCalculator()
-            .putVec4()
-            .putVec4()
             .putVec4()
             .putVec4()
             .putVec4()
@@ -153,7 +154,7 @@ public final class VpfxBuiltinUniformBuffer {
                             snapshot.fogSkyEnd,
                             snapshot.fogCloudEnd,
                             snapshot.fogKind,
-                            0.0F
+                            snapshot.heldLightRadius
                     )
                     .putVec4(
                             snapshot.skyColorR,
@@ -165,43 +166,31 @@ public final class VpfxBuiltinUniformBuffer {
                             snapshot.sunAngle,
                             snapshot.moonAngle,
                             snapshot.shadowAngle,
-                            0.0F
+                            snapshot.heldLightEnabled ? 1.0F : 0.0F
                     )
                     .putVec4(
                             snapshot.sunPositionX,
                             snapshot.sunPositionY,
                             snapshot.sunPositionZ,
-                            0.0F
+                            snapshot.heldLightRed
                     )
                     .putVec4(
                             snapshot.moonPositionX,
                             snapshot.moonPositionY,
                             snapshot.moonPositionZ,
-                            0.0F
+                            snapshot.heldLightGreen
                     )
                     .putVec4(
                             snapshot.shadowLightPositionX,
                             snapshot.shadowLightPositionY,
                             snapshot.shadowLightPositionZ,
-                            0.0F
+                            snapshot.heldLightBlue
                     )
                     .putVec4(
                             snapshot.upPositionX,
                             snapshot.upPositionY,
                             snapshot.upPositionZ,
-                            0.0F
-                    )
-                    .putVec4(
-                            snapshot.heldLightRed,
-                            snapshot.heldLightGreen,
-                            snapshot.heldLightBlue,
                             snapshot.heldLightIntensity
-                    )
-                    .putVec4(
-                            snapshot.heldLightRadius,
-                            snapshot.heldLightEnabled ? 1.0F : 0.0F,
-                            0.0F,
-                            0.0F
                     )
                     .putMat4f(snapshot.projectionMatrix)
                     .putMat4f(snapshot.inverseProjectionMatrix)
