@@ -54,18 +54,18 @@ public final class VpfxClientCommands {
 
     private static int executeHelp(CommandContext<FabricClientCommandSource> context) {
         FabricClientCommandSource source = context.getSource();
-        send(source, "VPFX commands:");
-        send(source, "  /vpfx reload          - reload current configured pack");
-        send(source, "  /vpfx reload auto     - auto-select first safe ZIP and reload");
-        send(source, "  /vpfx reload builtin  - switch to built-in debug pack");
-        send(source, "  /vpfx list            - list discovered VPFX packs");
-        send(source, "  /vpfx off             - disable VPFX and return to vanilla");
+        sendKey(source, "command.vulkanpostfx.help.title");
+        sendKey(source, "command.vulkanpostfx.help.reload");
+        sendKey(source, "command.vulkanpostfx.help.reload_auto");
+        sendKey(source, "command.vulkanpostfx.help.reload_builtin");
+        sendKey(source, "command.vulkanpostfx.help.list");
+        sendKey(source, "command.vulkanpostfx.help.off");
         return Command.SINGLE_SUCCESS;
     }
 
     private static int executeReloadCurrent(CommandContext<FabricClientCommandSource> context) {
         FabricClientCommandSource source = context.getSource();
-        send(source, "VPFX reload started for current config...");
+        sendKey(source, "command.vulkanpostfx.reload.started");
 
         CompletableFuture<Void> future = VpfxHotReloadManager.hotReloadCurrentPack(
                 Minecraft.getInstance(),
@@ -79,7 +79,7 @@ public final class VpfxClientCommands {
 
     private static int executeReloadAuto(CommandContext<FabricClientCommandSource> context) {
         FabricClientCommandSource source = context.getSource();
-        send(source, "VPFX auto-select reload started. New ZIP packs in shaderpacks/ will be considered...");
+        sendKey(source, "command.vulkanpostfx.reload_auto.started");
 
         CompletableFuture<Void> future = VpfxHotReloadManager.selectAutoAndReload(
                 Minecraft.getInstance(),
@@ -92,7 +92,7 @@ public final class VpfxClientCommands {
 
     private static int executeReloadBuiltin(CommandContext<FabricClientCommandSource> context) {
         FabricClientCommandSource source = context.getSource();
-        send(source, "VPFX switching to built-in debug pack...");
+        sendKey(source, "command.vulkanpostfx.reload_builtin.started");
 
         CompletableFuture<Void> future = VpfxHotReloadManager.selectBuiltinAndReload(
                 Minecraft.getInstance(),
@@ -110,12 +110,12 @@ public final class VpfxClientCommands {
         ShaderPackContainer active = ActiveShaderPackManager.getActivePack();
         List<ShaderPackContainer> packs = ActiveShaderPackManager.getDiscoveredPacks();
 
-        send(source, "VPFX discovered packs: " + packs.size());
-        send(source, "Active: " + describePack(active));
+        sendKey(source, "command.vulkanpostfx.list.count", packs.size());
+        sendKey(source, "command.vulkanpostfx.list.active", describePack(active));
 
         for (ShaderPackContainer pack : packs) {
             String prefix = ActiveShaderPackManager.isActivePack(pack) ? "* " : "  ";
-            send(source, prefix + describePack(pack));
+            send(source, Component.literal(prefix + describePack(pack)));
         }
 
         return Command.SINGLE_SUCCESS;
@@ -124,7 +124,7 @@ public final class VpfxClientCommands {
     private static int executeOff(CommandContext<FabricClientCommandSource> context) {
         PostFxRuntimeState.setDebugEffectEnabled(false);
         PostFxRuntimeState.requestReapply();
-        send(context.getSource(), "VPFX disabled. Vanilla rendering requested.");
+        sendKey(context.getSource(), "command.vulkanpostfx.off.done");
         VulkanPostFX.LOGGER.info(
                 "[{}] VPFX disabled by client command: /vpfx off",
                 VulkanPostFX.MOD_ID
@@ -140,7 +140,7 @@ public final class VpfxClientCommands {
             ShaderPackContainer activePack = ActiveShaderPackManager.getActivePack();
 
             if (throwable != null) {
-                send(source, "VPFX reload failed safely. Vanilla rendering was requested. Check latest.log.");
+                sendKey(source, "command.vulkanpostfx.reload.failed");
                 VulkanPostFX.LOGGER.error(
                         "[{}] VPFX reload command failed safely; vanilla rendering requested",
                         VulkanPostFX.MOD_ID,
@@ -149,13 +149,13 @@ public final class VpfxClientCommands {
                 return;
             }
 
-            send(source, "VPFX reload complete. Active: " + describePack(activePack));
+            sendKey(source, "command.vulkanpostfx.reload.complete", describePack(activePack));
         }));
     }
 
     private static String describePack(ShaderPackContainer pack) {
         if (pack == null) {
-            return "none";
+            return Component.translatable("vulkanpostfx.common.none").getString();
         }
 
         return pack.manifest().name()
@@ -164,7 +164,11 @@ public final class VpfxClientCommands {
                 + "]";
     }
 
-    private static void send(FabricClientCommandSource source, String message) {
-        source.sendFeedback(Component.literal(message));
+    private static void send(FabricClientCommandSource source, Component message) {
+        source.sendFeedback(message);
+    }
+
+    private static void sendKey(FabricClientCommandSource source, String key, Object... args) {
+        source.sendFeedback(Component.translatable(key, args));
     }
 }

@@ -159,15 +159,15 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
 
         fill(graphics, layout.searchX, layout.searchY, layout.searchX + layout.searchWidth, layout.searchY + 20, BG_INPUT);
         border(graphics, layout.searchX, layout.searchY, layout.searchWidth, 20, BORDER_SOFT);
-        text(graphics, "Search settings...", layout.searchX + 7, layout.searchY + 6, TEXT_MUTED);
+        text(graphics, tr("screen.vulkanpostfx.shaderpacks.search_placeholder"), layout.searchX + 7, layout.searchY + 6, TEXT_MUTED);
 
-        text(graphics, "Vulkan PostFX", layout.contentX, layout.titleY, TEXT_PRIMARY);
-        text(graphics, "Settings", layout.contentX + this.font.width("Vulkan PostFX") + 7, layout.titleY, TEXT_ACCENT);
+        text(graphics, tr("screen.vulkanpostfx.shaderpacks.brand"), layout.contentX, layout.titleY, TEXT_PRIMARY);
+        text(graphics, tr("screen.vulkanpostfx.shaderpacks.settings_suffix"), layout.contentX + this.font.width(tr("screen.vulkanpostfx.shaderpacks.brand")) + 7, layout.titleY, TEXT_ACCENT);
 
-        String compactState = state.vpfxEnabled() ? "ON" : "OFF";
+        String compactState = onOff(state.vpfxEnabled());
         int compactColor = state.failedEffectId().isBlank() ? (state.vpfxEnabled() ? TEXT_SUCCESS : TEXT_MUTED) : TEXT_ERROR;
-        String backend = state.nativeDirect() ? "Native" : state.postChainRuntime() ? "PostChain" : "Vanilla";
-        String status = reloadInProgress ? "Reloading..." : compactState + " · " + backend + " · " + state.activePackId();
+        String backend = state.nativeDirect() ? tr("vulkanpostfx.backend.kind.native") : state.postChainRuntime() ? tr("vulkanpostfx.backend.kind.postchain") : tr("vulkanpostfx.backend.kind.vanilla");
+        String status = reloadInProgress ? tr("screen.vulkanpostfx.shaderpacks.status.reloading") : compactState + " · " + backend + " · " + state.activePackId();
         textRight(graphics, status, layout.contentX + layout.contentWidth, layout.titleY, compactColor);
 
         fill(graphics, layout.frameX, layout.frameY, layout.frameX + layout.frameWidth, layout.frameY + layout.frameHeight, BG_FRAME);
@@ -175,7 +175,7 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         fill(graphics, layout.frameX, layout.frameY, layout.frameX + layout.frameWidth, layout.frameY + TAB_HEIGHT, BG_HEADER);
         fill(graphics, layout.frameX, layout.frameY + TAB_HEIGHT - 1, layout.frameX + layout.frameWidth, layout.frameY + TAB_HEIGHT, 0xAA345E7D);
 
-        String stateText = reloadInProgress ? "VPFX reload in progress" : textOf(statusMessage);
+        String stateText = reloadInProgress ? tr("screen.vulkanpostfx.shaderpacks.status.reload_in_progress") : textOf(statusMessage);
         text(graphics, stateText, layout.frameX + 8, layout.frameY + layout.frameHeight + 6, reloadInProgress ? TEXT_WARN : TEXT_SECONDARY);
     }
 
@@ -194,14 +194,14 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                 fill(graphics, x, layout.frameY + TAB_HEIGHT - 2, x + w, layout.frameY + TAB_HEIGHT, TEXT_ACCENT);
             }
             int color = active ? TEXT_ACCENT : hovered ? TEXT_HOVER : TEXT_SECONDARY;
-            textCentered(graphics, page.label, x, layout.frameY + 8, w, color);
+            textCentered(graphics, tr(page.labelKey), x, layout.frameY + 8, w, color);
             int zoneX = x;
             clickZones.add(new ClickZone(zoneX, layout.frameY, w, TAB_HEIGHT, true, () -> {
                 if (currentPage != page) {
                     currentPage = page;
                     packListScroll = 0;
                 }
-            }, page.description));
+            }, tr(page.descriptionKey)));
             x += w;
         }
     }
@@ -211,27 +211,27 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         int y = layout.bodyY;
         int width = layout.bodyWidth;
 
-        y = section(graphics, x, y, "Active Pack");
-        y = infoRow(graphics, x, y, width, "Current", state.activePackName() + " [" + state.activePackId() + "]", state.failedEffectId().isBlank() ? TEXT_SUCCESS : TEXT_ERROR);
-        y = infoRow(graphics, x, y, width, "Runtime", backendSummary(state), state.nativeDirect() ? TEXT_SUCCESS : TEXT_SECONDARY);
+        y = section(graphics, x, y, tr("screen.vulkanpostfx.shaderpacks.section.active_pack"));
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.current"), state.activePackName() + " [" + state.activePackId() + "]", state.failedEffectId().isBlank() ? TEXT_SUCCESS : TEXT_ERROR);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.runtime"), backendSummary(state), state.nativeDirect() ? TEXT_SUCCESS : TEXT_SECONDARY);
         y += 6;
 
         int actionW = (width - 16) / 3;
-        actionButton(graphics, x, y, actionW, "Reload", !reloadInProgress, mouseX, mouseY,
+        actionButton(graphics, x, y, actionW, tr("screen.vulkanpostfx.shaderpacks.reload"), !reloadInProgress, mouseX, mouseY,
                 () -> beginReload(VpfxHotReloadManager.hotReloadCurrentPack(Minecraft.getInstance(), true, "settings:reload-current"),
-                        Component.literal("Reloading current VPFX pack..."), Component.literal("Reloaded current VPFX pack")),
-                "Reload the currently active VPFX pack.");
-        actionButton(graphics, x + actionW + 8, y, actionW, "Auto", !reloadInProgress, mouseX, mouseY,
+                        trc("screen.vulkanpostfx.shaderpacks.status.reload_started"), trc("screen.vulkanpostfx.shaderpacks.status.reload_done")),
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.reload_current"));
+        actionButton(graphics, x + actionW + 8, y, actionW, tr("screen.vulkanpostfx.shaderpacks.auto_short"), !reloadInProgress, mouseX, mouseY,
                 () -> beginReload(VpfxHotReloadManager.selectAutoAndReload(Minecraft.getInstance(), "settings:select-auto"),
-                        Component.literal("Selecting native-compatible VPFX pack..."), Component.literal("Auto selection completed")),
-                "Prefer native-compatible external VPFX packs.");
-        actionButton(graphics, x + (actionW + 8) * 2, y, actionW, "Builtin", !reloadInProgress, mouseX, mouseY,
+                        trc("screen.vulkanpostfx.shaderpacks.status.auto_started"), trc("screen.vulkanpostfx.shaderpacks.status.auto_done")),
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.auto"));
+        actionButton(graphics, x + (actionW + 8) * 2, y, actionW, tr("screen.vulkanpostfx.shaderpacks.builtin_short"), !reloadInProgress, mouseX, mouseY,
                 () -> beginReload(VpfxHotReloadManager.selectBuiltinAndReload(Minecraft.getInstance(), "settings:select-builtin"),
-                        Component.literal("Loading built-in debug pack..."), Component.literal("Loaded built-in debug pack")),
-                "Load the built-in VPFX debug pack.");
+                        trc("screen.vulkanpostfx.shaderpacks.status.builtin_started"), trc("screen.vulkanpostfx.shaderpacks.status.builtin_done")),
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.builtin"));
         y += ROW_HEIGHT + 10;
 
-        y = section(graphics, x, y, "Available Packs");
+        y = section(graphics, x, y, tr("screen.vulkanpostfx.shaderpacks.section.available_packs"));
         List<VpfxPackListEntry> packs = state.packs();
 
         int listTop = y;
@@ -244,13 +244,13 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         packListScroll = clamp(packListScroll, 0, Math.max(0, packListContentHeight - packListViewportHeight));
 
         if (packListContentHeight > packListViewportHeight) {
-            textRight(graphics, "scroll " + (packListScroll + 1) + "/" + Math.max(1, packListContentHeight - packListViewportHeight + 1), x + width, listTop - 12, TEXT_MUTED);
+            textRight(graphics, tr("screen.vulkanpostfx.shaderpacks.scroll", packListScroll + 1, Math.max(1, packListContentHeight - packListViewportHeight + 1)), x + width, listTop - 12, TEXT_MUTED);
         }
 
         graphics.enableScissor(x, listTop, x + width, listBottom);
         int rowY = listTop - packListScroll;
         if (packs.isEmpty()) {
-            plainRow(graphics, x, rowY, width, "No VPFX packs found", "Put .zip packs in shaderpacks/", TEXT_MUTED, mouseX, mouseY, null, "No external or builtin VPFX packs were discovered.");
+            plainRow(graphics, x, rowY, width, tr("screen.vulkanpostfx.shaderpacks.no_packs.title"), tr("screen.vulkanpostfx.shaderpacks.no_packs.body"), TEXT_MUTED, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.no_packs.tooltip"));
         } else {
             for (VpfxPackListEntry pack : packs) {
                 int rowHeight = packRowHeight(pack, width);
@@ -269,83 +269,83 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         int x = layout.bodyX;
         int y = layout.bodyY;
         int width = layout.bodyWidth;
-        y = section(graphics, x, y, "General");
-        y = settingRow(graphics, x, y, width, "Enable VPFX", state.vpfxEnabled() ? "ON" : "OFF", state.vpfxEnabled() ? TEXT_SUCCESS : TEXT_MUTED,
+        y = section(graphics, x, y, tr("category.vulkanpostfx.general"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.enable_vpfx"), onOff(state.vpfxEnabled()), state.vpfxEnabled() ? TEXT_SUCCESS : TEXT_MUTED,
                 mouseX, mouseY, () -> {
                     boolean enabled = PostFxRuntimeState.toggleDebugEffectEnabled();
                     PostFxRuntimeState.requestReapply();
-                    statusMessage = Component.literal("VPFX " + (enabled ? "enabled" : "disabled"));
-                }, "Toggle the active VPFX effect chain. Same idea as F8.");
-        y = settingRow(graphics, x, y, width, "Shadow Depth Debug", state.shadowDepthDebug() ? "ON" : "OFF", state.shadowDepthDebug() ? TEXT_WARN : TEXT_MUTED,
+                    statusMessage = trc(enabled ? "screen.vulkanpostfx.shaderpacks.status.vpfx_enabled" : "screen.vulkanpostfx.shaderpacks.status.vpfx_disabled");
+                }, tr("screen.vulkanpostfx.shaderpacks.tooltip.enable_vpfx"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.shadow_depth_debug"), onOff(state.shadowDepthDebug()), state.shadowDepthDebug() ? TEXT_WARN : TEXT_MUTED,
                 mouseX, mouseY, () -> {
                     boolean enabled = PostFxRuntimeState.toggleShadowDepthDebugView();
                     PostFxRuntimeState.requestReapply();
-                    statusMessage = Component.literal("Shadow depth debug " + (enabled ? "enabled" : "disabled"));
-                }, "Toggle shadow depth debug view. Same idea as F9.");
-        y = settingRow(graphics, x, y, width, "Current Effect", state.effectId(), TEXT_SECONDARY, mouseX, mouseY, null, "Current effect or runtime post-effect id.");
-        y = settingRow(graphics, x, y, width, "Config Mode", state.configMode(), TEXT_SECONDARY, mouseX, mouseY, null, "Current shader pack selection mode from VPFX config.");
+                    statusMessage = trc(enabled ? "screen.vulkanpostfx.shaderpacks.status.shadow_debug_enabled" : "screen.vulkanpostfx.shaderpacks.status.shadow_debug_disabled");
+                }, tr("screen.vulkanpostfx.shaderpacks.tooltip.shadow_depth_debug"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.current_effect"), state.effectId(), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.current_effect"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.config_mode"), state.configMode(), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.config_mode"));
     }
 
     private void drawBackendPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
         int x = layout.bodyX;
         int y = layout.bodyY;
         int width = layout.bodyWidth;
-        y = section(graphics, x, y, "Backend");
-        y = settingRow(graphics, x, y, width, "Backend", state.backendId(), state.nativeDirect() ? TEXT_SUCCESS : TEXT_SECONDARY, mouseX, mouseY, null, "The active VPFX runtime backend.");
-        y = settingRow(graphics, x, y, width, "Display Name", state.backendDisplayName(), TEXT_SECONDARY, mouseX, mouseY, null, "Human-readable backend name.");
-        y = settingRow(graphics, x, y, width, "Native Direct", yesNo(state.nativeDirect()), state.nativeDirect() ? TEXT_SUCCESS : TEXT_MUTED, mouseX, mouseY, null, "Whether native direct framegraph execution is active.");
-        y = settingRow(graphics, x, y, width, "PostChain Runtime", yesNo(state.postChainRuntime()), state.postChainRuntime() ? TEXT_WARN : TEXT_MUTED, mouseX, mouseY, null, "Whether Minecraft PostChain backend is active.");
-        y = settingRow(graphics, x, y, width, "Passes / Targets", state.passCount() + " / " + state.targetCount(), TEXT_SECONDARY, mouseX, mouseY, null, "Parsed pass and target counts for the active pack.");
-        y = settingRow(graphics, x, y, width, "Fallback Reason", state.fallbackReason(), state.fallbackReason().equals("none") ? TEXT_MUTED : TEXT_WARN, mouseX, mouseY, null, "Why VPFX skipped or fell back, if applicable.");
+        y = section(graphics, x, y, tr("category.vulkanpostfx.backend"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.backend"), state.backendId(), state.nativeDirect() ? TEXT_SUCCESS : TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.backend"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.display_name"), state.backendDisplayName(), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.display_name"));
+        y = settingRow(graphics, x, y, width, tr("vulkanpostfx.backend.native"), yesNo(state.nativeDirect()), state.nativeDirect() ? TEXT_SUCCESS : TEXT_MUTED, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.native_direct"));
+        y = settingRow(graphics, x, y, width, tr("vulkanpostfx.backend.postchain"), yesNo(state.postChainRuntime()), state.postChainRuntime() ? TEXT_WARN : TEXT_MUTED, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.postchain_runtime"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.passes_targets"), state.passCount() + " / " + state.targetCount(), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.passes_targets"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.fallback_reason"), state.fallbackReason(), state.fallbackReason().equals("none") ? TEXT_MUTED : TEXT_WARN, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.fallback_reason"));
     }
 
     private void drawDebugPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
         int x = layout.bodyX;
         int y = layout.bodyY;
         int width = layout.bodyWidth;
-        y = section(graphics, x, y, "Debug");
-        y = settingRow(graphics, x, y, width, "VPFX Status HUD", PostFxRuntimeState.isDebugHudVisible() ? "ON" : "OFF", PostFxRuntimeState.isDebugHudVisible() ? TEXT_SUCCESS : TEXT_MUTED,
+        y = section(graphics, x, y, tr("category.vulkanpostfx.debug"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.status_hud"), onOff(PostFxRuntimeState.isDebugHudVisible()), PostFxRuntimeState.isDebugHudVisible() ? TEXT_SUCCESS : TEXT_MUTED,
                 mouseX, mouseY, () -> {
                     boolean enabled = PostFxRuntimeState.toggleDebugHudVisible();
-                    statusMessage = Component.literal("VPFX status HUD " + (enabled ? "shown" : "hidden"));
-                }, "Show or hide the VPFX text overlay in the top-left corner. Hidden by default for normal users.");
-        y = settingRow(graphics, x, y, width, "Failed Effect", state.failedEffectId().isBlank() ? "none" : state.failedEffectId(), state.failedEffectId().isBlank() ? TEXT_MUTED : TEXT_ERROR, mouseX, mouseY, null, "The external post effect currently marked as failed.");
-        y = settingRow(graphics, x, y, width, "Runtime Namespace", emptyAsNone(state.runtimeNamespace()), TEXT_SECONDARY, mouseX, mouseY, null, "Runtime namespace generated for the active ZIP pack.");
-        y = settingRow(graphics, x, y, width, "Runtime Root", shortPath(state.runtimeRoot()), TEXT_MUTED, mouseX, mouseY, null, "Materialized runtime resource pack root.");
+                    statusMessage = trc(enabled ? "screen.vulkanpostfx.shaderpacks.status.hud_shown" : "screen.vulkanpostfx.shaderpacks.status.hud_hidden");
+                }, tr("screen.vulkanpostfx.shaderpacks.tooltip.status_hud"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.failed_effect"), state.failedEffectId().isBlank() ? tr("vulkanpostfx.common.none") : state.failedEffectId(), state.failedEffectId().isBlank() ? TEXT_MUTED : TEXT_ERROR, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.failed_effect"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.runtime_namespace"), emptyAsNone(state.runtimeNamespace()), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.runtime_namespace"));
+        y = settingRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.setting.runtime_root"), shortPath(state.runtimeRoot()), TEXT_MUTED, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.tooltip.runtime_root"));
         y += 8;
-        actionButton(graphics, x, y, width, "Clear Failed State by Reloading Current Pack", !reloadInProgress, mouseX, mouseY,
+        actionButton(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.action.clear_failed"), !reloadInProgress, mouseX, mouseY,
                 () -> beginReload(VpfxHotReloadManager.hotReloadCurrentPack(Minecraft.getInstance(), true, "settings:clear-failed-reload"),
-                        Component.literal("Reloading to clear failed state..."), Component.literal("Reload completed")),
-                "Reloading a fixed pack should clear the failed-pack guard.");
+                        trc("screen.vulkanpostfx.shaderpacks.status.clear_failed_reload_started"), trc("screen.vulkanpostfx.shaderpacks.status.reload_completed")),
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.clear_failed"));
     }
 
     private void drawDeveloperPage(GuiGraphicsExtractor graphics, Layout layout, VpfxUiState state, int mouseX, int mouseY) {
         int x = layout.bodyX;
         int y = layout.bodyY;
         int width = layout.bodyWidth;
-        y = section(graphics, x, y, "Developer Snapshot");
-        y = infoRow(graphics, x, y, width, "Pack ID", state.activePackId(), TEXT_SECONDARY);
-        y = infoRow(graphics, x, y, width, "Pack Source", state.activePackSource(), TEXT_SECONDARY);
-        y = infoRow(graphics, x, y, width, "Backend ID", state.backendId(), TEXT_SECONDARY);
-        y = infoRow(graphics, x, y, width, "Effect", state.effectId(), TEXT_SECONDARY);
-        y = infoRow(graphics, x, y, width, "Config", state.configMode(), TEXT_SECONDARY);
-        y = infoRow(graphics, x, y, width, "Pass Count", String.valueOf(state.passCount()), TEXT_SECONDARY);
-        y = infoRow(graphics, x, y, width, "Target Count", String.valueOf(state.targetCount()), TEXT_SECONDARY);
+        y = section(graphics, x, y, tr("screen.vulkanpostfx.shaderpacks.section.developer_snapshot"));
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.pack_id"), state.activePackId(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.pack_source"), state.activePackSource(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.backend_id"), state.backendId(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.effect"), state.effectId(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.config"), state.configMode(), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.pass_count"), String.valueOf(state.passCount()), TEXT_SECONDARY);
+        y = infoRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.label.target_count"), String.valueOf(state.targetCount()), TEXT_SECONDARY);
     }
 
     private void drawAboutPage(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
         int x = layout.bodyX;
         int y = layout.bodyY;
         int width = layout.bodyWidth;
-        y = section(graphics, x, y, "About VPFX");
-        y = plainRow(graphics, x, y, width, "Vulkan PostFX", "Custom VPFX shader pack format and native rendering experiments.", TEXT_ACCENT, mouseX, mouseY, null, "VPFX is not an Iris/OptiFine shaderpack loader.");
-        y = plainRow(graphics, x, y, width, "F7", "Open this settings screen", TEXT_SECONDARY, mouseX, mouseY, null, "Open VPFX settings.");
-        y = plainRow(graphics, x, y, width, "F8", "Toggle VPFX", TEXT_SECONDARY, mouseX, mouseY, null, "Enable or disable the active VPFX effect.");
-        y = plainRow(graphics, x, y, width, "F9", "Shadow depth debug is unbound by default", TEXT_SECONDARY, mouseX, mouseY, null, "This is a heavy debug view and may reduce FPS. Bind it manually in Controls if needed.");
+        y = section(graphics, x, y, tr("screen.vulkanpostfx.shaderpacks.section.about"));
+        y = plainRow(graphics, x, y, width, tr("screen.vulkanpostfx.shaderpacks.brand"), tr("screen.vulkanpostfx.shaderpacks.about.description"), TEXT_ACCENT, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.about.not_iris"));
+        y = plainRow(graphics, x, y, width, "F7", tr("screen.vulkanpostfx.shaderpacks.about.f7"), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.about.f7.tooltip"));
+        y = plainRow(graphics, x, y, width, "F8", tr("screen.vulkanpostfx.shaderpacks.about.f8"), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.about.f8.tooltip"));
+        y = plainRow(graphics, x, y, width, "F9", tr("screen.vulkanpostfx.shaderpacks.about.f9"), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.about.f9.tooltip"));
         y += 8;
         Path shaderPackDirectory = ActiveShaderPackManager.getShaderPackDirectory();
-        y = plainRow(graphics, x, y, width, "HUD", "Hidden by default", TEXT_SECONDARY, mouseX, mouseY, null, "Enable it from Debug -> VPFX Status HUD if you need the top-left status overlay. It can also be forced with -Dvulkanpostfx.debug.hud=true.");
-        plainRow(graphics, x, y, width, "shaderpacks/", String.valueOf(shaderPackDirectory), TEXT_MUTED, mouseX, mouseY, null, "Put external VPFX ZIP packs here.");
+        y = plainRow(graphics, x, y, width, "HUD", tr("screen.vulkanpostfx.shaderpacks.about.hud"), TEXT_SECONDARY, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.about.hud.tooltip"));
+        plainRow(graphics, x, y, width, "shaderpacks/", String.valueOf(shaderPackDirectory), TEXT_MUTED, mouseX, mouseY, null, tr("screen.vulkanpostfx.shaderpacks.about.shaderpacks.tooltip"));
     }
 
     private void drawFooter(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
@@ -367,7 +367,7 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                 autoX,
                 buttonY,
                 buttonW,
-                "Auto",
+                tr("screen.vulkanpostfx.shaderpacks.auto_short"),
                 !reloadInProgress,
                 mouseX,
                 mouseY,
@@ -376,10 +376,10 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                                 Minecraft.getInstance(),
                                 "settings:footer-auto"
                         ),
-                        Component.literal("Auto selecting VPFX pack..."),
-                        Component.literal("Auto selection completed")
+                        trc("screen.vulkanpostfx.shaderpacks.status.auto_started"),
+                        trc("screen.vulkanpostfx.shaderpacks.status.auto_done")
                 ),
-                "Auto select a native-compatible pack."
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.auto")
         );
 
         actionButton(
@@ -387,7 +387,7 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                 reloadX,
                 buttonY,
                 buttonW,
-                "Reload",
+                tr("screen.vulkanpostfx.shaderpacks.reload"),
                 !reloadInProgress,
                 mouseX,
                 mouseY,
@@ -397,10 +397,10 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                                 true,
                                 "settings:footer-reload"
                         ),
-                        Component.literal("Reloading current pack..."),
-                        Component.literal("Reload completed")
+                        trc("screen.vulkanpostfx.shaderpacks.status.reload_started"),
+                        trc("screen.vulkanpostfx.shaderpacks.status.reload_completed")
                 ),
-                "Reload current pack."
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.reload_current")
         );
 
         actionButton(
@@ -408,12 +408,12 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                 doneX,
                 buttonY,
                 buttonW,
-                "Done",
+                tr("screen.vulkanpostfx.shaderpacks.done"),
                 true,
                 mouseX,
                 mouseY,
                 this::onClose,
-                "Close VPFX settings."
+                tr("screen.vulkanpostfx.shaderpacks.tooltip.done")
         );
     }
 
@@ -512,8 +512,8 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
                     : VpfxHotReloadManager.selectExternalAndReload(Minecraft.getInstance(), pack.id(), "settings:select:" + pack.id());
             beginReload(
                     future,
-                    Component.literal("Loading VPFX pack: " + pack.name()),
-                    Component.literal("Loaded VPFX pack: " + pack.name())
+                    trc("screen.vulkanpostfx.shaderpacks.status.loading_pack", pack.name()),
+                    trc("screen.vulkanpostfx.shaderpacks.status.loaded_pack", pack.name())
             );
         };
         if (zoneBottom > zoneY) {
@@ -646,7 +646,9 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
 
             if (throwable != null) {
                 String message = throwable.getMessage();
-                statusMessage = Component.literal("VPFX reload failed" + (message == null ? "" : ": " + message));
+                statusMessage = message == null || message.isBlank()
+                        ? trc("screen.vulkanpostfx.shaderpacks.status.reload_failed")
+                        : trc("screen.vulkanpostfx.shaderpacks.status.reload_failed.detail", message);
                 VulkanPostFX.LOGGER.error("[{}] VPFX settings reload action failed", VulkanPostFX.MOD_ID, throwable);
             } else {
                 statusMessage = successMessage;
@@ -662,21 +664,21 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         String diagnostics = pack.diagnosticsText();
         try {
             Minecraft.getInstance().keyboardHandler.setClipboard(diagnostics);
-            statusMessage = Component.literal("Copied VPFX diagnostics: " + pack.name());
+            statusMessage = trc("screen.vulkanpostfx.shaderpacks.status.diagnostics_copied", pack.name());
         } catch (Throwable t) {
-            statusMessage = Component.literal("Failed to copy diagnostics: " + t.getClass().getSimpleName());
+            statusMessage = trc("screen.vulkanpostfx.shaderpacks.status.diagnostics_copy_failed", t.getClass().getSimpleName());
             VulkanPostFX.LOGGER.warn("[{}] Failed to copy VPFX pack diagnostics to clipboard", VulkanPostFX.MOD_ID, t);
         }
     }
 
     private String packBadge(VpfxPackListEntry pack) {
         if (pack.invalid()) {
-            return "Invalid";
+            return tr("vulkanpostfx.pack.status.invalid");
         }
         if (pack.warning()) {
-            return "Warning";
+            return tr("vulkanpostfx.pack.status.warning");
         }
-        return pack.backendHint();
+        return localizedBackendHint(pack.backendHint());
     }
 
     private int packBadgeColor(VpfxPackListEntry pack) {
@@ -696,14 +698,14 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
 
     private String passTargetHint(VpfxPackListEntry pack) {
         if (pack.passCount() <= 0 && pack.targetCount() <= 0) {
-            return pack.invalid() ? "invalid pack" : "non-native pack";
+            return pack.invalid() ? tr("screen.vulkanpostfx.shaderpacks.pack_hint.invalid") : tr("screen.vulkanpostfx.shaderpacks.pack_hint.non_native");
         }
-        return "passes=" + pack.passCount() + ", targets=" + pack.targetCount();
+        return tr("screen.vulkanpostfx.shaderpacks.pack_hint.pass_target", pack.passCount(), pack.targetCount());
     }
 
     private String packDescription(VpfxPackListEntry pack) {
         if (pack.invalid()) {
-            return pack.diagnosticSummary() + " · click to copy diagnostics";
+            return pack.diagnosticSummary() + " · " + tr("screen.vulkanpostfx.shaderpacks.pack_hint.click_copy_diagnostics");
         }
         if (pack.warning()) {
             return pack.diagnosticSummary() + " · " + passTargetHint(pack);
@@ -714,10 +716,10 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
     private String packTooltip(VpfxPackListEntry pack) {
         StringBuilder tooltip = new StringBuilder();
         tooltip.append(pack.name()).append(" · ").append(pack.source()).append(" · ").append(passTargetHint(pack));
-        tooltip.append("\nStatus: ").append(pack.statusLabel());
-        tooltip.append("\nPath: ").append(pack.sourcePath());
+        tooltip.append("\n").append(tr("screen.vulkanpostfx.shaderpacks.tooltip.status", localizedPackStatus(pack)));
+        tooltip.append("\n").append(tr("screen.vulkanpostfx.shaderpacks.tooltip.path", pack.sourcePath()));
         if (pack.invalid()) {
-            tooltip.append("\nClick to copy validation diagnostics.");
+            tooltip.append("\n").append(tr("screen.vulkanpostfx.shaderpacks.pack_hint.click_copy_diagnostics"));
         } else {
             tooltip.append("\n").append(pack.diagnosticSummary());
         }
@@ -726,7 +728,7 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
 
 
     private String backendSummary(VpfxUiState state) {
-        String kind = state.nativeDirect() ? "native" : state.postChainRuntime() ? "postchain" : "vanilla";
+        String kind = state.nativeDirect() ? tr("vulkanpostfx.backend.kind.native") : state.postChainRuntime() ? tr("vulkanpostfx.backend.kind.postchain") : tr("vulkanpostfx.backend.kind.vanilla");
         return state.backendId() + " (" + kind + ")";
     }
 
@@ -784,16 +786,16 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
     }
 
     private static String yesNo(boolean value) {
-        return value ? "yes" : "no";
+        return value ? tr("vulkanpostfx.common.yes") : tr("vulkanpostfx.common.no");
     }
 
     private static String emptyAsNone(String value) {
-        return value == null || value.isBlank() ? "none" : value;
+        return value == null || value.isBlank() ? tr("vulkanpostfx.common.none") : value;
     }
 
     private static String shortPath(String value) {
         if (value == null || value.isBlank()) {
-            return "none";
+            return tr("vulkanpostfx.common.none");
         }
         int slash = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'));
         return slash >= 0 ? ".../" + value.substring(slash + 1) : value;
@@ -920,20 +922,54 @@ public final class VpfxShaderPackSelectionScreen extends Screen {
         return component == null ? "" : component.getString();
     }
 
+    private static String tr(String key, Object... args) {
+        return Component.translatable(key, args).getString();
+    }
+
+    private static Component trc(String key, Object... args) {
+        return Component.translatable(key, args);
+    }
+
+    private static String onOff(boolean value) {
+        return tr(value ? "vulkanpostfx.common.on" : "vulkanpostfx.common.off");
+    }
+
+    private String localizedPackStatus(VpfxPackListEntry pack) {
+        return switch (pack.status()) {
+            case VALID -> tr("vulkanpostfx.pack.status.valid");
+            case WARNING -> tr("vulkanpostfx.pack.status.warning");
+            case INVALID -> tr("vulkanpostfx.pack.status.invalid");
+        };
+    }
+
+    private String localizedBackendHint(String backendHint) {
+        if (backendHint == null || backendHint.isBlank()) {
+            return tr("vulkanpostfx.backend.kind.unknown");
+        }
+        return switch (backendHint) {
+            case "Builtin" -> tr("vulkanpostfx.backend.kind.builtin");
+            case "Native" -> tr("vulkanpostfx.backend.kind.native");
+            case "PostChain" -> tr("vulkanpostfx.backend.kind.postchain");
+            case "Invalid" -> tr("vulkanpostfx.pack.status.invalid");
+            case "Unknown" -> tr("vulkanpostfx.backend.kind.unknown");
+            default -> backendHint;
+        };
+    }
+
     private enum UiPage {
-        PACKS("Packs", "Select and reload VPFX shader packs."),
-        GENERAL("General", "General VPFX toggles."),
-        BACKEND("Backend", "Runtime backend state."),
-        DEBUG("Debug", "Failure and debug state."),
-        DEVELOPER("Developer", "Raw developer snapshot."),
-        ABOUT("About", "About Vulkan PostFX.");
+        PACKS("category.vulkanpostfx.packs", "screen.vulkanpostfx.shaderpacks.tabs.packs.tooltip"),
+        GENERAL("category.vulkanpostfx.general", "screen.vulkanpostfx.shaderpacks.tabs.general.tooltip"),
+        BACKEND("category.vulkanpostfx.backend", "screen.vulkanpostfx.shaderpacks.tabs.backend.tooltip"),
+        DEBUG("category.vulkanpostfx.debug", "screen.vulkanpostfx.shaderpacks.tabs.debug.tooltip"),
+        DEVELOPER("category.vulkanpostfx.developer", "screen.vulkanpostfx.shaderpacks.tabs.developer.tooltip"),
+        ABOUT("category.vulkanpostfx.about", "screen.vulkanpostfx.shaderpacks.tabs.about.tooltip");
 
-        private final String label;
-        private final String description;
+        private final String labelKey;
+        private final String descriptionKey;
 
-        UiPage(String label, String description) {
-            this.label = label;
-            this.description = description;
+        UiPage(String labelKey, String descriptionKey) {
+            this.labelKey = labelKey;
+            this.descriptionKey = descriptionKey;
         }
     }
 

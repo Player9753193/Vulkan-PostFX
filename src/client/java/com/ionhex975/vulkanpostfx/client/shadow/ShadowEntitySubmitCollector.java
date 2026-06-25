@@ -1,147 +1,187 @@
 package com.ionhex975.vulkanpostfx.client.shadow;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.SubmitNodeCollection;
+import java.util.List;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.MovingBlockRenderState;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.UvMapping;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Quaternionf;
-
-import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Filtered SubmitNodeCollector for the VPFX entity shadow pass.
+ * Filtered {@link SubmitNodeCollector} for the VPFX entity shadow pass.
  *
- * Wraps a {@link SubmitNodeStorage} and only delegates submit calls that produce
- * actual geometry useful for shadow map rendering. Vanilla shadow blobs,
- * name tags, text, flame, leash, outlines, gizmos, and particles are silently
- * dropped so they never enter the shadow_depth target.
+ * <p>Minecraft 26.3 snapshot moved more entity rendering into submit-node based
+ * extraction. Extending {@link SubmitNodeStorage} keeps this collector compatible
+ * with vanilla/Fabric interface additions while still allowing VPFX to filter the
+ * submits that should not enter the shadow-depth target.</p>
  *
- * {@code submitModel} clears {@code outlineColor} and {@code crumblingOverlay}
- * before forwarding so that glowing outlines and block-destruction overlays
- * do not pollute shadow depth.
+ * <p>Only actual geometry that can contribute to a shadow map is forwarded.
+ * Vanilla shadow blobs, name tags, text, flame, leash, outlines, gizmos,
+ * particles, custom geometry, and breaking overlays are dropped.</p>
  */
-public final class ShadowEntitySubmitCollector implements SubmitNodeCollector {
-
-    private final SubmitNodeStorage storage;
-
-    public ShadowEntitySubmitCollector() {
-        this.storage = new SubmitNodeStorage();
-    }
+public final class ShadowEntitySubmitCollector extends SubmitNodeStorage {
 
     /**
-     * Returns the inner {@link SubmitNodeStorage} populated with shadow-eligible
-     * entity submits, ready for {@code FeatureRenderDispatcher.prepareFrame(...)}.
+     * Returns this collector as the storage object expected by
+     * {@code FeatureRenderDispatcher.prepareFrame(...)}.
      */
     public SubmitNodeStorage storage() {
-        return this.storage;
+        return this;
     }
 
-    // ---- SubmitNodeCollector ----
+    // ---- Allowed submits (forwarded, but outline / crumbling overlays removed) ----
 
     @Override
-    public SubmitNodeCollection order(int order) {
-        return this.storage.order(order);
-    }
-
-    // ---- Allowed submits (forwarded to storage) ----
-
-    @Override
-    public <S> void submitModel(net.minecraft.client.model.Model<? super S> model, S data, PoseStack poseStack,
-                                RenderType renderType, int packedLight, int packedOverlay, int tintedColor,
-                                TextureAtlasSprite sprite, int outlineColor,
-                                ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
+    public <S> void submitModel(
+            Model<? super S> model,
+            S state,
+            PoseStack poseStack,
+            RenderType renderType,
+            int lightCoords,
+            int overlayCoords,
+            int tintedColor,
+            @Nullable UvMapping uvMapping,
+            int outlineColor,
+            ModelFeatureRenderer.@Nullable CrumblingOverlay crumblingOverlay
+    ) {
         // Preserve the original tintedColor. Player skins and many entity models
-        // pass -1 here; replacing it with 0 makes the model fully transparent
-        // and prevents it from contributing useful shadow depth. Only clear the
-        // outline and crumbling overlay channels.
-        this.storage.submitModel(model, data, poseStack, renderType, packedLight, packedOverlay,
-                tintedColor, sprite, 0, null);
+        // pass -1 here; replacing it with 0 can make the model fully transparent.
+        // Only clear outline and crumbling overlay for the shadow-depth pass.
+        super.submitModel(
+                model,
+                state,
+                poseStack,
+                renderType,
+                lightCoords,
+                overlayCoords,
+                tintedColor,
+                uvMapping,
+                0,
+                null
+        );
     }
 
     @Override
-    public void submitItem(PoseStack poseStack, ItemDisplayContext displayContext,
-                           int packedLight, int overlay, int outlineColor, int[] tints,
-                           List<BakedQuad> quads, net.minecraft.client.renderer.item.ItemStackRenderState.FoilType foilType) {
-        this.storage.submitItem(poseStack, displayContext, packedLight, overlay, 0, tints, quads, foilType);
+    public void submitItem(
+            PoseStack poseStack,
+            ItemDisplayContext displayContext,
+            int lightCoords,
+            int overlayCoords,
+            int outlineColor,
+            int[] tintLayers,
+            List<BakedQuad> quads,
+            ItemStackRenderState.FoilType foilType
+    ) {
+        super.submitItem(poseStack, displayContext, lightCoords, overlayCoords, 0, tintLayers, quads, foilType);
     }
 
     @Override
-    public void submitBlockModel(PoseStack poseStack, RenderType renderType,
-                                 List<net.minecraft.client.renderer.block.dispatch.BlockStateModelPart> parts,
-                                 int[] tints, int packedLight, int overlay, int outlineColor) {
-        this.storage.submitBlockModel(poseStack, renderType, parts, tints, packedLight, overlay, 0);
+    public void submitBlockModel(
+            PoseStack poseStack,
+            RenderType renderType,
+            List<BlockStateModelPart> parts,
+            int[] tintLayers,
+            int lightCoords,
+            int overlayCoords,
+            int outlineColor
+    ) {
+        super.submitBlockModel(poseStack, renderType, parts, tintLayers, lightCoords, overlayCoords, 0);
     }
 
     @Override
-    public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState renderState, int outlineColor) {
-        this.storage.submitMovingBlock(poseStack, renderState, 0);
+    public void submitMovingBlock(PoseStack poseStack, MovingBlockRenderState movingBlockRenderState, int outlineColor) {
+        super.submitMovingBlock(poseStack, movingBlockRenderState, 0);
     }
 
     // ---- Filtered submits (no-op — must not enter shadow map) ----
 
     @Override
-    public void submitShadow(PoseStack poseStack, float radius,
-                             List<EntityRenderState.ShadowPiece> shadowPieces) {
+    public void submitShadow(PoseStack poseStack, float radius, List<EntityRenderState.ShadowPiece> pieces) {
         // Vanilla circular shadow blob — not a VPFX shadow caster.
     }
 
     @Override
-    public void submitNameTag(PoseStack poseStack, net.minecraft.world.phys.Vec3 pos,
-                              int packedLight, Component component, boolean seeThrough,
-                              int color, CameraRenderState cameraState) {
+    public void submitNameTag(
+            PoseStack poseStack,
+            @Nullable Vec3 nameTagAttachment,
+            int offset,
+            Component name,
+            boolean seeThrough,
+            int lightCoords,
+            CameraRenderState camera
+    ) {
+        // Name tags must never write into shadow depth.
     }
 
     @Override
-    public void submitText(PoseStack poseStack, float x, float y,
-                           FormattedCharSequence text, boolean seeThrough,
-                           net.minecraft.client.gui.Font.DisplayMode displayMode,
-                           int packedLight, int color, int backgroundColor, int opacity) {
+    public void submitText(
+            PoseStack poseStack,
+            float x,
+            float y,
+            FormattedCharSequence string,
+            boolean dropShadow,
+            Font.DisplayMode displayMode,
+            int lightCoords,
+            int color,
+            int backgroundColor,
+            int outlineColor
+    ) {
+        // Text and labels must never write into shadow depth.
     }
 
     @Override
     public void submitFlame(PoseStack poseStack, EntityRenderState renderState, Quaternionf rotation) {
+        // Dropped for now. Fire is a light/emissive visual, not solid shadow geometry.
     }
 
     @Override
     public void submitLeash(PoseStack poseStack, EntityRenderState.LeashState leashState) {
+        // Leashes are thin auxiliary geometry; exclude from the shadow map.
     }
 
     @Override
-    public void submitShapeOutline(PoseStack poseStack, VoxelShape shape,
-                                   RenderType renderType, int color, float lineWidth,
-                                   boolean disableDepthTest) {
+    public void submitShapeOutline(PoseStack poseStack, VoxelShape shape, RenderType renderType, int color, float width, boolean afterTerrain) {
+        // Debug/selection outlines must not enter shadow depth.
     }
 
     @Override
-    public void submitBreakingBlockModel(PoseStack poseStack,
-                                         List<net.minecraft.client.renderer.block.dispatch.BlockStateModelPart> parts,
-                                         int color) {
+    public void submitBreakingBlockModel(PoseStack poseStack, List<BlockStateModelPart> parts, int progress) {
+        // Block breaking overlay must not enter shadow depth.
     }
 
     @Override
-    public void submitCustomGeometry(PoseStack poseStack, RenderType renderType,
-                                     SubmitNodeCollector.CustomGeometryRenderer renderer) {
+    public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer renderer) {
+        // Unknown custom geometry is intentionally dropped from the shadow-depth pass.
     }
 
     @Override
-    public void submitQuadParticleGroup(QuadParticleRenderState particleGroup) {
+    public void submitQuadParticleGroup(QuadParticleRenderState particles) {
+        // Particles are screen/world effects, not stable shadow casters.
     }
 
     @Override
     public void submitGizmoPrimitives(
             net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives.Group group,
-            CameraRenderState cameraState, boolean depthTest) {
+            CameraRenderState camera,
+            boolean onTop
+    ) {
+        // Gizmos/debug primitives must not enter shadow depth.
     }
 }

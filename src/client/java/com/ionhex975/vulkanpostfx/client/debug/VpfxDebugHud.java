@@ -10,6 +10,7 @@ import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
 
 /**
  * Lightweight VPFX runtime HUD.
@@ -50,24 +51,24 @@ public final class VpfxDebugHud {
 		graphics.text(client.font, "[VPFX] " + stateLabel, BASE_X, y, stateColor);
 		y += LINE_HEIGHT;
 
-		graphics.text(client.font, "Pack: " + activePackLabel(), BASE_X, y, COLOR_INFO);
+		graphics.text(client.font, tr("vulkanpostfx.hud.pack", activePackLabel()), BASE_X, y, COLOR_INFO);
 		y += LINE_HEIGHT;
 
-		graphics.text(client.font, "Backend: " + PostFxRuntimeState.getBackendName()
-				+ " / " + runtimeBackendLabel(), BASE_X, y, COLOR_INFO);
+		graphics.text(client.font, tr("vulkanpostfx.hud.backend", PostFxRuntimeState.getBackendName()
+				+ " / " + runtimeBackendLabel()), BASE_X, y, COLOR_INFO);
 		y += LINE_HEIGHT;
 
-		graphics.text(client.font, "Effect: " + activeEffectLabel(), BASE_X, y, COLOR_INFO);
+		graphics.text(client.font, tr("vulkanpostfx.hud.effect", activeEffectLabel()), BASE_X, y, COLOR_INFO);
 		y += LINE_HEIGHT;
 
 		if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
-			graphics.text(client.font, "Native fallback: " + fallbackLabel(), BASE_X, y, COLOR_WARN);
+			graphics.text(client.font, tr("vulkanpostfx.hud.native_fallback", fallbackLabel()), BASE_X, y, COLOR_WARN);
 			y += LINE_HEIGHT;
 		}
 
 		String sourceLabel = activeSourceLabel();
 		if (!sourceLabel.isBlank()) {
-			graphics.text(client.font, "Source: " + sourceLabel, BASE_X, y, COLOR_LABEL);
+			graphics.text(client.font, tr("vulkanpostfx.hud.source", sourceLabel), BASE_X, y, COLOR_LABEL);
 			y += LINE_HEIGHT;
 		}
 
@@ -76,23 +77,20 @@ public final class VpfxDebugHud {
 
 		int shadowColor = shadowState.isShadowPassEnabled() ? COLOR_ON : COLOR_OFF;
 		String shadowStatus = shadowState.isShadowPassEnabled()
-				? "Shadow: ON (pass=" + shadowState.wasShadowPassExecuted()
-						+ " casters=" + shadowState.wereShadowCastersRendered()
-						+ ")"
-				: "Shadow: OFF";
+				? tr("vulkanpostfx.hud.shadow.on", shadowState.wasShadowPassExecuted(), shadowState.wereShadowCastersRendered())
+				: tr("vulkanpostfx.hud.shadow.off");
 		graphics.text(client.font, shadowStatus, BASE_X, y, shadowColor);
 		y += LINE_HEIGHT;
 
 		if (shadowState.isShadowPassEnabled() && shadowState.isShadowTargetReady()) {
-			graphics.text(client.font, "  size=" + shadowState.getShadowMapSize()
-							+ " terrainDist=" + formatDist(shadowState.getTerrainShadowDistance())
-							+ " entityDist=" + formatDist(shadowState.getEntityShadowDistance()),
+			graphics.text(client.font, tr("vulkanpostfx.hud.shadow.size", shadowState.getShadowMapSize(),
+							formatDist(shadowState.getTerrainShadowDistance()),
+							formatDist(shadowState.getEntityShadowDistance())),
 					BASE_X, y, COLOR_LABEL);
 			y += LINE_HEIGHT;
 
-			String targetInfo = "  targetReady=" + shadowTargets.isReady()
-					+ " executed=" + shadowState.wasShadowPassExecuted()
-					+ " casters=" + shadowState.wereShadowCastersRendered();
+			String targetInfo = tr("vulkanpostfx.hud.shadow.target_info", shadowTargets.isReady(),
+					shadowState.wasShadowPassExecuted(), shadowState.wereShadowCastersRendered());
 			graphics.text(client.font, targetInfo, BASE_X, y, COLOR_LABEL);
 			y += LINE_HEIGHT;
 		}
@@ -107,21 +105,21 @@ public final class VpfxDebugHud {
 
 	private static String runtimeStateLabel() {
 		if (PostFxRuntimeState.isShadowDepthDebugViewEnabled()) {
-			return "DEBUG";
+			return tr("vulkanpostfx.hud.state.debug");
 		}
 		if (PostFxRuntimeState.isExternalPackMarkedFailed()) {
-			return "FAILED -> VANILLA";
+			return tr("vulkanpostfx.hud.state.failed_to_vanilla");
 		}
 		if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
-			return "NATIVE -> POSTCHAIN";
+			return tr("vulkanpostfx.hud.state.native_to_postchain");
 		}
 		if (!PostFxRuntimeState.isDebugEffectEnabled()) {
-			return "OFF";
+			return tr("vulkanpostfx.common.off");
 		}
 		if (PostFxRuntimeState.getActiveExternalPostEffectId() != null) {
-			return "ON";
+			return tr("vulkanpostfx.common.on");
 		}
-		return "ON (BUILTIN)";
+		return tr("vulkanpostfx.hud.state.on_builtin");
 	}
 
 	private static int runtimeStateColor() {
@@ -140,7 +138,7 @@ public final class VpfxDebugHud {
 	private static String activePackLabel() {
 		ShaderPackContainer pack = ActiveShaderPackManager.getActivePack();
 		if (pack == null) {
-			return "none";
+			return tr("vulkanpostfx.common.none");
 		}
 
 		String label = pack.manifest().name()
@@ -162,20 +160,20 @@ public final class VpfxDebugHud {
 		String displayName = PostFxRuntimeState.getActiveRuntimeBackendDisplayName();
 
 		if (backendId == null || backendId.isBlank()) {
-			return "unknown";
+			return tr("vulkanpostfx.backend.kind.unknown");
 		}
 
 		String mode;
 		if (PostFxRuntimeState.isExternalPackMarkedFailed()) {
-			mode = "vanilla fallback";
+			mode = tr("vulkanpostfx.hud.backend_mode.vanilla_fallback");
 		} else if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
-			mode = "postchain fallback";
+			mode = tr("vulkanpostfx.hud.backend_mode.postchain_fallback");
 		} else if (PostFxRuntimeState.isActiveNativeRuntimeBackend()) {
-			mode = "native";
+			mode = tr("vulkanpostfx.backend.kind.native");
 		} else if (PostFxRuntimeState.activeRuntimeBackendUsesPostChain()) {
-			mode = "postchain";
+			mode = tr("vulkanpostfx.backend.kind.postchain");
 		} else {
-			mode = "custom";
+			mode = tr("vulkanpostfx.hud.backend_mode.custom");
 		}
 
 		String label = backendId + " (" + mode + ")";
@@ -187,7 +185,7 @@ public final class VpfxDebugHud {
 
 	private static String activeEffectLabel() {
 		if (PostFxRuntimeState.isShadowDepthDebugViewEnabled()) {
-			return "SHADOW_DEPTH_DEBUG";
+			return tr("vulkanpostfx.hud.effect.shadow_depth_debug");
 		}
 
 		Identifier externalId = PostFxRuntimeState.getActiveExternalPostEffectId();
@@ -196,7 +194,7 @@ public final class VpfxDebugHud {
 		}
 
 		String effectKey = PostFxRuntimeState.getActiveEffectKey();
-		return effectKey == null || effectKey.isBlank() ? "none" : clamp(effectKey);
+		return effectKey == null || effectKey.isBlank() ? tr("vulkanpostfx.common.none") : clamp(effectKey);
 	}
 
 	private static String fallbackLabel() {
@@ -230,4 +228,8 @@ public final class VpfxDebugHud {
 		}
 		return value.substring(0, Math.max(0, MAX_VALUE_LENGTH - 3)) + "...";
 	}
+	private static String tr(String key, Object... args) {
+		return Component.translatable(key, args).getString();
+	}
+
 }
