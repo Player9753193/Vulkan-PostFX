@@ -1,6 +1,8 @@
 package com.ionhex975.vulkanpostfx.client.postfx;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthProvider;
+import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
 import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
@@ -34,26 +36,39 @@ public final class SceneDepthCaptureTargets {
         RenderSystem.assertOnRenderThread();
 
         if (minecraft == null) {
+            VpfxSceneDepthProvider.markUnavailable("minecraft client is null");
+            return;
+        }
+        if (minecraft.gameRenderer == null) {
+            VpfxSceneDepthProvider.markUnavailable("gameRenderer is null");
             return;
         }
 
         RenderTarget mainTarget = minecraft.gameRenderer.mainRenderTarget();
         if (mainTarget == null) {
+            VpfxSceneDepthProvider.markUnavailable("main render target is null");
             return;
         }
 
         ensureAllocated(mainTarget.width, mainTarget.height);
 
         if (!this.ready || this.sceneDepthTarget == null) {
+            VpfxSceneDepthProvider.markUnavailable("scene depth target is not allocated");
             return;
         }
 
-        if (mainTarget.getDepthTexture() == null || this.sceneDepthTarget.getDepthTexture() == null) {
+        if (mainTarget.getDepthTexture() == null) {
+            VpfxSceneDepthProvider.markUnavailable("main render target has no depth texture");
+            return;
+        }
+        if (this.sceneDepthTarget.getDepthTexture() == null) {
+            VpfxSceneDepthProvider.markUnavailable("VPFX scene depth target has no depth texture");
             return;
         }
 
         try {
             this.sceneDepthTarget.copyDepthFrom(mainTarget);
+            VpfxSceneDepthProvider.markCaptured(mainTarget.width, mainTarget.height, PostFxRuntimeState.currentFrameEpoch());
 
             if (!this.firstCapturedLogged) {
                 this.firstCapturedLogged = true;
@@ -65,6 +80,7 @@ public final class SceneDepthCaptureTargets {
                 );
             }
         } catch (Throwable t) {
+            VpfxSceneDepthProvider.markUnavailable("scene depth copy failed: " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));
             VulkanPostFX.LOGGER.error(
                     "[{}] Scene depth capture failed",
                     VulkanPostFX.MOD_ID,
@@ -90,6 +106,7 @@ public final class SceneDepthCaptureTargets {
             this.width = width;
             this.height = height;
             this.ready = true;
+            VpfxSceneDepthProvider.markAllocated(width, height);
 
             if (!this.firstAllocatedLogged) {
                 this.firstAllocatedLogged = true;
@@ -106,6 +123,7 @@ public final class SceneDepthCaptureTargets {
             this.width = 0;
             this.height = 0;
             this.ready = false;
+            VpfxSceneDepthProvider.markUnavailable("failed to allocate scene depth target: " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));
 
             VulkanPostFX.LOGGER.error(
                     "[{}] Failed to allocate scene depth target",
@@ -126,6 +144,7 @@ public final class SceneDepthCaptureTargets {
         this.width = 0;
         this.height = 0;
         this.ready = false;
+        VpfxSceneDepthProvider.markReleased("scene depth target released");
     }
 
     public boolean isReady() {

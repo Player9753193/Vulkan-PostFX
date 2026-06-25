@@ -169,5 +169,15 @@
   "command.vulkanpostfx.off.done": "VPFX désactivé. Rendu vanilla demandé.",
   "command.vulkanpostfx.reload.failed": "Échec sécurisé du rechargement VPFX. Le rendu vanilla a été demandé. Vérifiez latest.log.",
   "command.vulkanpostfx.reload.complete": "Rechargement VPFX terminé. Actif : %s",
-  "vulkanpostfx.hud.held_light": "Lumière tenue : %s"
+  "vulkanpostfx.hud.held_light": "Lumière tenue : %s",
+  "command.vulkanpostfx.help.doctor": "  /vpfx doctor          - lancer un auto-test VPFX en lecture seule",
+  "command.vulkanpostfx.doctor.copied": "Rapport VPFX doctor copié dans le presse-papiers.",
+  "command.vulkanpostfx.doctor.logged": "Rapport VPFX doctor écrit dans latest.log.",
+  "command.vulkanpostfx.doctor.failed": "Échec de VPFX doctor : %s",
+  "command.vulkanpostfx.help.export_diagnostics": "  /vpfx export-diagnostics - exporter une archive ZIP de diagnostic VPFX",
+  "command.vulkanpostfx.export_diagnostics.complete": "Diagnostics VPFX exportés : %s (fichiers=%s, ignorés=%s). Chemin copié dans le presse-papiers.",
+  "command.vulkanpostfx.export_diagnostics.failed": "Échec de l’export des diagnostics VPFX : %s",
+  "vulkanpostfx.hud.scene_depth": "Profondeur de scène : %s",
+  "vulkanpostfx.hud.shadow_depth": "Profondeur des ombres : %s",
+  "vulkanpostfx.hud.colored_lights": "Lumières colorées : %s"
 }

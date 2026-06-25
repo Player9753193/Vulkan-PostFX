@@ -13,6 +13,7 @@ public final class RuntimeZipPackState {
     private static volatile String runtimeNamespace = "";
     private static volatile Path runtimeRoot;
     private static volatile Identifier externalPostEffectId;
+    private static volatile boolean minecraftResourceReloadedWithRuntimePack;
     private static volatile Map<String, VpfxTargetDefinition> targetDefinitions = Map.of();
 
     private RuntimeZipPackState() {
@@ -40,6 +41,7 @@ public final class RuntimeZipPackState {
         runtimeNamespace = "";
         runtimeRoot = null;
         externalPostEffectId = null;
+        minecraftResourceReloadedWithRuntimePack = false;
         targetDefinitions = Map.of();
     }
 
@@ -78,6 +80,17 @@ public final class RuntimeZipPackState {
 
     public static Path getRuntimeRoot() {
         return runtimeRoot;
+    }
+
+
+    public static void markMinecraftResourceReloadCompleted() {
+        if (active && resourcePackInjectionAllowed) {
+            minecraftResourceReloadedWithRuntimePack = true;
+        }
+    }
+
+    public static boolean isMinecraftResourceReloadedWithRuntimePack() {
+        return minecraftResourceReloadedWithRuntimePack;
     }
 
     public static Identifier getExternalPostEffectId() {

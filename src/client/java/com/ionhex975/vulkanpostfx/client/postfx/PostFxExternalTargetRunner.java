@@ -1,10 +1,14 @@
 package com.ionhex975.vulkanpostfx.client.postfx;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthProvider;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthState;
 import com.ionhex975.vulkanpostfx.client.diagnostics.VpfxFailureDiagnostics;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxCapabilityResolver;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxRuntimeCapabilities;
 import com.ionhex975.vulkanpostfx.client.shadow.ShadowRenderTargetsLite;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthProvider;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthState;
 import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.pipeline.RenderTarget;
@@ -53,9 +57,10 @@ public final class PostFxExternalTargetRunner {
 
         if (caps.isSceneDepth()) {
             SceneDepthCaptureTargets sceneDepthTargets = SceneDepthCaptureTargets.get();
+            VpfxSceneDepthState sceneDepthState = VpfxSceneDepthProvider.currentState();
             RenderTarget sceneDepthTarget = sceneDepthTargets.getSceneDepthTarget();
 
-            if (sceneDepthTargets.isReady() && sceneDepthTarget != null) {
+            if (sceneDepthTargets.isReady() && sceneDepthState.available() && sceneDepthTarget != null) {
                 bundle.put(
                         PostFxExternalTargetIds.SCENE_DEPTH,
                         frame.importExternal("scene_depth", sceneDepthTarget)
@@ -80,9 +85,12 @@ public final class PostFxExternalTargetRunner {
                 if (!firstSceneDepthFallbackLogged) {
                     firstSceneDepthFallbackLogged = true;
                     VulkanPostFX.LOGGER.warn(
-                            "[{}] Scene depth target is not ready during PostChain.process; falling back to main target depth for external id {}",
+                            "[{}] Scene depth target is not ready during PostChain.process; falling back to main target depth for external id {}, stateAvailable={}, targetReady={}, reason={}",
                             VulkanPostFX.MOD_ID,
-                            PostFxExternalTargetIds.SCENE_DEPTH
+                            PostFxExternalTargetIds.SCENE_DEPTH,
+                            sceneDepthState.available(),
+                            sceneDepthState.targetReady(),
+                            sceneDepthState.reason()
                     );
                 }
             }
@@ -90,9 +98,10 @@ public final class PostFxExternalTargetRunner {
 
         if (caps.isShadowDepth()) {
             ShadowRenderTargetsLite shadowTargets = ShadowRenderTargetsLite.get();
+            VpfxShadowDepthState shadowDepthState = VpfxShadowDepthProvider.currentState();
             RenderTarget shadowDepthTarget = shadowTargets.getShadowDepthTarget();
 
-            if (shadowTargets.isReady() && shadowDepthTarget != null) {
+            if (shadowTargets.isReady() && shadowDepthState.available() && shadowDepthTarget != null) {
                 bundle.put(
                         PostFxExternalTargetIds.SHADOW_DEPTH,
                         frame.importExternal("shadow_depth", shadowDepthTarget)
@@ -117,9 +126,12 @@ public final class PostFxExternalTargetRunner {
                 if (!firstShadowFallbackLogged) {
                     firstShadowFallbackLogged = true;
                     VulkanPostFX.LOGGER.warn(
-                            "[{}] Shadow target is not ready during PostChain.process; falling back to main target for external id {}",
+                            "[{}] Shadow target is not ready during PostChain.process; falling back to main target for external id {}, stateAvailable={}, targetReady={}, reason={}",
                             VulkanPostFX.MOD_ID,
-                            PostFxExternalTargetIds.SHADOW_DEPTH
+                            PostFxExternalTargetIds.SHADOW_DEPTH,
+                            shadowDepthState.available(),
+                            shadowDepthState.targetReady(),
+                            shadowDepthState.reason()
                     );
                 }
             }

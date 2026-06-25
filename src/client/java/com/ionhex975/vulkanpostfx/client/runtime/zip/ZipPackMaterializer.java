@@ -40,6 +40,7 @@ public final class ZipPackMaterializer {
         }
 
         String packId = activePack.manifest().id();
+        String runtimePackId = ActiveZipRuntimeNamespace.runtimePackId();
         String runtimeNamespace = ActiveZipRuntimeNamespace.fromPackId(packId);
 
         Path runtimeBaseDir = gameDirectory.resolve("vulkanpostfx_runtime");
@@ -90,15 +91,17 @@ public final class ZipPackMaterializer {
                 buildRuntimeTargetDefinitions(activePack, runtimeNamespace);
 
         VulkanPostFX.LOGGER.info(
-                "[{}] Generated runtime texture manifest: namespace={}, textureCount={}, path={}",
+                "[{}] Generated runtime texture manifest: sourcePackId={}, runtimePackId={}, namespace={}, textureCount={}, path={}",
                 VulkanPostFX.MOD_ID,
+                packId,
+                runtimePackId,
                 runtimeNamespace,
                 runtimeTextureManifest.getTextures().size(),
                 runtimeTextureManifestPath
         );
 
         return new RuntimeZipPackMaterializationResult(
-                packId,
+                runtimePackId,
                 runtimeNamespace,
                 runtimeRoot,
                 Identifier.fromNamespaceAndPath(runtimeNamespace, "main"),

@@ -31,12 +31,16 @@ public final class ShadowRendererLite {
         if (!caps.isShadowDepth() || !PostFxRuntimeState.isDebugEffectEnabled()) {
             state.setShadowPassEnabled(false);
             state.setShadowTargetState(false, 0);
+            VpfxShadowDepthProvider.markUnavailable(!caps.isShadowDepth()
+                    ? "shadow_depth capability is disabled"
+                    : "VPFX effect is disabled");
             return;
         }
 
         if (minecraft.level == null || cameraState == null || !cameraState.initialized) {
             state.setShadowPassEnabled(false);
             state.setShadowTargetState(false, 0);
+            VpfxShadowDepthProvider.markUnavailable("client level or camera state is unavailable");
             return;
         }
 
@@ -46,12 +50,19 @@ public final class ShadowRendererLite {
         float terrainDistance = DEFAULT_TERRAIN_SHADOW_DISTANCE;
         float entityDistance = terrainDistance * DEFAULT_ENTITY_SHADOW_DISTANCE_MUL;
 
-        state.setShadowPassEnabled(true);
+        state.setShadowPassEnabled(state.hasRenderableShadowLight());
         state.setShadowDistances(terrainDistance, entityDistance);
         state.setShadowCasterControls(true, true);
         state.setShadowTargetState(targets.isReady(), targets.getShadowMapSize());
+        VpfxShadowDepthProvider.markPrepared(state);
 
-        if (targets.isReady()) {
+        if (!state.isShadowPassEnabled()) {
+            VpfxShadowDepthProvider.markUnavailable("no renderable sun/moon shadow light this frame: primaryLight="
+                    + state.getPrimaryLight()
+                    + ", intensity=" + state.getShadowLightIntensity());
+        }
+
+        if (targets.isReady() && state.isShadowPassEnabled()) {
             state.requestShadowRender();
         }
 

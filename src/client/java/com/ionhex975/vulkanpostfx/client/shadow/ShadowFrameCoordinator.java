@@ -47,6 +47,7 @@ public final class ShadowFrameCoordinator {
 
         if (minecraft.level == null || cameraState == null || !cameraState.initialized) {
             ShadowFrameState.get().invalidate();
+            VpfxShadowDepthProvider.markUnavailable("client level or camera state is unavailable during shadow frame sync");
             lastPrimaryLight = PrimaryLight.NONE;
             lastLoggedPrimaryLight = PrimaryLight.NONE;
             lastSmoothedShadowLightIntensity = 0.0F;

@@ -47,6 +47,7 @@ public final class ShadowRenderTargetsLite {
                 this.requestedShadowMapSize = size;
                 this.shadowMapSize = attemptedSize;
                 this.ready = true;
+                VpfxShadowDepthProvider.markAllocated(attemptedSize);
 
                 if (!firstAllocatedLogged) {
                     firstAllocatedLogged = true;
@@ -76,6 +77,7 @@ public final class ShadowRenderTargetsLite {
                 this.requestedShadowMapSize = 0;
                 this.shadowMapSize = 0;
                 this.ready = false;
+                VpfxShadowDepthProvider.markUnavailable("failed to allocate shadow depth target at " + attemptedSize + "x" + attemptedSize + ": " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));
 
                 if (attemptedSize <= MIN_FALLBACK_SIZE) {
                     VulkanPostFX.LOGGER.error(
@@ -111,6 +113,7 @@ public final class ShadowRenderTargetsLite {
         this.requestedShadowMapSize = 0;
         this.shadowMapSize = 0;
         this.ready = false;
+        VpfxShadowDepthProvider.markReleased("shadow depth target released");
     }
 
     public boolean isReady() {

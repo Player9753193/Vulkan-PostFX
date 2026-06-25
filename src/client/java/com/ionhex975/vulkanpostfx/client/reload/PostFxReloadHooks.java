@@ -2,6 +2,7 @@ package com.ionhex975.vulkanpostfx.client.reload;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
 import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
+import com.ionhex975.vulkanpostfx.client.runtime.zip.RuntimeZipPackState;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
@@ -42,11 +43,13 @@ public final class PostFxReloadHooks {
                         .thenCompose(preparationBarrier::wait)
                         .thenRunAsync(() -> {
                             try {
+                                RuntimeZipPackState.markMinecraftResourceReloadCompleted();
                                 PostFxRuntimeState.requestReapply();
 
                                 VulkanPostFX.LOGGER.info(
-                                        "[{}] Resource reload completed; requested VPFX PostFX state reapply",
-                                        VulkanPostFX.MOD_ID
+                                        "[{}] Resource reload completed; requested VPFX PostFX state reapply. runtimePackLoaded={}",
+                                        VulkanPostFX.MOD_ID,
+                                        RuntimeZipPackState.isMinecraftResourceReloadedWithRuntimePack()
                                 );
                             } catch (Throwable t) {
                                 VulkanPostFX.LOGGER.error(

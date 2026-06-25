@@ -363,6 +363,10 @@ public final class PostFxRuntimeState {
         return perFrameEpoch.incrementAndGet();
     }
 
+    public static int currentFrameEpoch() {
+        return perFrameEpoch.get();
+    }
+
     public static void resetPerFrameState() {
         int epoch = perFrameEpoch.get();
         if (lastResetEpoch == epoch) {

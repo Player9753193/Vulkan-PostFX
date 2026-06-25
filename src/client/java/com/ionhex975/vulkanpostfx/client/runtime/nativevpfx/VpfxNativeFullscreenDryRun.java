@@ -136,7 +136,7 @@ public final class VpfxNativeFullscreenDryRun {
 					resolvedInputs.add(sceneColorResource);
 				} else if ("minecraft:main".equals(target)) {
 					resolvedInputs.add(mainResource);
-				} else if ("minecraft:scene_depth".equals(target)) {
+				} else if ("minecraft:scene_depth".equals(target) || "vulkanpostfx:scene_depth".equals(target)) {
 					resolvedInputs.add(new VpfxNativeResolvedResource(
 							target,
 							VpfxNativeResolvedResource.Role.SCENE_DEPTH_INPUT,
@@ -144,7 +144,7 @@ public final class VpfxNativeFullscreenDryRun {
 							0,
 							0
 					));
-				} else if ("minecraft:shadow_depth".equals(target)) {
+				} else if ("minecraft:shadow_depth".equals(target) || "vulkanpostfx:shadow_depth".equals(target)) {
 					resolvedInputs.add(new VpfxNativeResolvedResource(
 							target,
 							VpfxNativeResolvedResource.Role.SHADOW_DEPTH_INPUT,

@@ -1,13 +1,19 @@
 package com.ionhex975.vulkanpostfx.client.debug;
 
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthProvider;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthState;
 import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightInfo;
 import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightProvider;
+import com.ionhex975.vulkanpostfx.client.light.colored.VpfxColoredLightCollector;
+import com.ionhex975.vulkanpostfx.client.light.colored.VpfxColoredLightSnapshot;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectBridge;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectSource;
 import com.ionhex975.vulkanpostfx.client.shadow.ShadowFrameState;
 import com.ionhex975.vulkanpostfx.client.shadow.ShadowRenderTargetsLite;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthProvider;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthState;
 import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -65,7 +71,13 @@ public final class VpfxDebugHud {
 		graphics.text(client.font, tr("vulkanpostfx.hud.effect", activeEffectLabel()), BASE_X, y, COLOR_INFO);
 		y += LINE_HEIGHT;
 
+		graphics.text(client.font, tr("vulkanpostfx.hud.scene_depth", sceneDepthLabel()), BASE_X, y, COLOR_LABEL);
+		y += LINE_HEIGHT;
+
 		graphics.text(client.font, tr("vulkanpostfx.hud.held_light", heldLightLabel()), BASE_X, y, COLOR_LABEL);
+		y += LINE_HEIGHT;
+
+		graphics.text(client.font, tr("vulkanpostfx.hud.colored_lights", coloredLightsLabel()), BASE_X, y, COLOR_LABEL);
 		y += LINE_HEIGHT;
 
 		if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
@@ -81,6 +93,11 @@ public final class VpfxDebugHud {
 
 		ShadowFrameState shadowState = ShadowFrameState.get();
 		ShadowRenderTargetsLite shadowTargets = ShadowRenderTargetsLite.get();
+		VpfxShadowDepthState shadowDepthState = VpfxShadowDepthProvider.currentState();
+
+		graphics.text(client.font, tr("vulkanpostfx.hud.shadow_depth", shadowDepthLabel(shadowDepthState)), BASE_X, y,
+				shadowDepthState.available() ? COLOR_LABEL : COLOR_WARN);
+		y += LINE_HEIGHT;
 
 		int shadowColor = shadowState.isShadowPassEnabled() ? COLOR_ON : COLOR_OFF;
 		String shadowStatus = shadowState.isShadowPassEnabled()
@@ -208,6 +225,28 @@ public final class VpfxDebugHud {
 		return clamp(PostFxRuntimeState.getNativeRuntimeFallbackSummary());
 	}
 
+	private static String sceneDepthLabel() {
+		VpfxSceneDepthState state = VpfxSceneDepthProvider.currentState();
+		if (state.available()) {
+			return clamp(state.sizeString() + " source=" + state.source() + " frame=" + state.frameEpoch());
+		}
+		return clamp("unavailable: " + state.reason());
+	}
+
+	private static String shadowDepthLabel(VpfxShadowDepthState state) {
+		if (state == null) {
+			return "unavailable: no state";
+		}
+		if (state.available()) {
+			return clamp(state.sizeString()
+					+ " source=" + state.source()
+					+ " frame=" + state.frameEpoch()
+					+ " light=" + state.primaryLight()
+					+ " casters=" + state.castersRendered());
+		}
+		return clamp("unavailable: " + state.reason());
+	}
+
 	private static String heldLightLabel() {
 		VpfxHeldLightInfo heldLight = VpfxHeldLightProvider.currentHeldLight();
 		if (heldLight == null || !heldLight.enabled()) {
@@ -220,6 +259,17 @@ public final class VpfxDebugHud {
 				heldLight.blue(),
 				heldLight.intensity(),
 				heldLight.radius()));
+	}
+
+	private static String coloredLightsLabel() {
+		VpfxColoredLightSnapshot snapshot = VpfxColoredLightCollector.currentSnapshot();
+		if (snapshot == null || !snapshot.enabled()) {
+			return clamp("unavailable: " + (snapshot == null ? "no state" : snapshot.reason()));
+		}
+		return clamp("count=" + snapshot.lightCount()
+				+ " raw=" + snapshot.rawLightCount()
+				+ " radius=" + snapshot.scanRadius()
+				+ " origin=" + snapshot.originString());
 	}
 
 	private static String activeSourceLabel() {

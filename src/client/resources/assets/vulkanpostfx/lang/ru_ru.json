@@ -169,5 +169,15 @@
   "command.vulkanpostfx.off.done": "VPFX отключён. Запрошен vanilla-рендеринг.",
   "command.vulkanpostfx.reload.failed": "Безопасная перезагрузка VPFX завершилась с ошибкой. Запрошен vanilla-рендеринг. Проверьте latest.log.",
   "command.vulkanpostfx.reload.complete": "Перезагрузка VPFX завершена. Активно: %s",
-  "vulkanpostfx.hud.held_light": "Свет в руке: %s"
+  "vulkanpostfx.hud.held_light": "Свет в руке: %s",
+  "command.vulkanpostfx.help.doctor": "  /vpfx doctor          - запустить проверку состояния VPFX без изменений",
+  "command.vulkanpostfx.doctor.copied": "Отчёт VPFX doctor скопирован в буфер обмена.",
+  "command.vulkanpostfx.doctor.logged": "Отчёт VPFX doctor записан в latest.log.",
+  "command.vulkanpostfx.doctor.failed": "Ошибка VPFX doctor: %s",
+  "command.vulkanpostfx.help.export_diagnostics": "  /vpfx export-diagnostics - экспортировать ZIP-архив диагностики VPFX",
+  "command.vulkanpostfx.export_diagnostics.complete": "Диагностика VPFX экспортирована: %s (файлов=%s, пропущено=%s). Путь скопирован в буфер обмена.",
+  "command.vulkanpostfx.export_diagnostics.failed": "Не удалось экспортировать диагностику VPFX: %s",
+  "vulkanpostfx.hud.scene_depth": "Глубина сцены: %s",
+  "vulkanpostfx.hud.shadow_depth": "Глубина теней: %s",
+  "vulkanpostfx.hud.colored_lights": "Цветные источники света: %s"
 }

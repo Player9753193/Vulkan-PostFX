@@ -169,5 +169,15 @@
   "command.vulkanpostfx.off.done": "VPFX 已禁用，已请求原版渲染。",
   "command.vulkanpostfx.reload.failed": "VPFX 安全重载失败，已请求原版渲染。请检查 latest.log。",
   "command.vulkanpostfx.reload.complete": "VPFX 重载完成。当前：%s",
-  "vulkanpostfx.hud.held_light": "手持光源：%s"
+  "vulkanpostfx.hud.held_light": "手持光源：%s",
+  "command.vulkanpostfx.help.doctor": "  /vpfx doctor          - 运行只读 VPFX 运行时自检",
+  "command.vulkanpostfx.doctor.copied": "VPFX 自检报告已复制到剪贴板。",
+  "command.vulkanpostfx.doctor.logged": "VPFX 自检报告已写入 latest.log。",
+  "command.vulkanpostfx.doctor.failed": "VPFX 自检失败：%s",
+  "command.vulkanpostfx.help.export_diagnostics": "  /vpfx export-diagnostics - 导出 VPFX 诊断 ZIP 包",
+  "command.vulkanpostfx.export_diagnostics.complete": "VPFX 诊断包已导出：%s（文件=%s，跳过=%s）。路径已复制到剪贴板。",
+  "command.vulkanpostfx.export_diagnostics.failed": "VPFX 诊断包导出失败：%s",
+  "vulkanpostfx.hud.scene_depth": "场景深度：%s",
+  "vulkanpostfx.hud.shadow_depth": "阴影深度：%s",
+  "vulkanpostfx.hud.colored_lights": "彩色光源：%s"
 }

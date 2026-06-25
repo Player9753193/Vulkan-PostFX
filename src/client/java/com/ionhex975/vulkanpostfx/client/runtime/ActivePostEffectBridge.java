@@ -122,31 +122,20 @@ public final class ActivePostEffectBridge {
                         ? backendSelection.fallbackReason()
                         : null;
 
-                if (activePack.isVpfxNativePack()
-                        && activePack.vpfxDefinition() != null
-                        && backend.capabilities().nativeRuntime()) {
-                    VpfxNativePackDefinition vpfxDef = activePack.vpfxDefinition();
-                    try {
-                        VpfxNativeRuntimeSupport.runDryRunCheck(vpfxDef.getManifest(), vpfxDef.getGraph());
-                        VpfxNativeFullscreenDryRun.run(Minecraft.getInstance(), vpfxDef.getManifest(), vpfxDef.getGraph());
-                    } catch (Throwable t) {
-                        nativeFallbackStage = VpfxBackendSelectionResult.STAGE_PREPARE;
-                        nativeFallbackReason = "native backend preparation failed: "
-                                + (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
-                        backend = new VpfxPostChainBackend();
-                        PostFxRuntimeState.setActiveRuntimeBackend(backend);
-
-                        VulkanPostFX.LOGGER.warn(
-                                "[{}] VPFX native backend preparation failed. Falling back to minecraft_postchain without marking the pack failed: pack='{}', stage={}, reason={}",
-                                VulkanPostFX.MOD_ID,
-                                activePack.manifest().name(),
-                                nativeFallbackStage,
-                                nativeFallbackReason,
-                                t
-                        );
-                    }
-                }
-
+                /*
+                 * Materialize before any native shader/pipeline preflight.
+                 *
+                 * Native RenderPipeline lookup is namespace based. The previous implementation
+                 * ran VpfxNativeFullscreenDryRun before RuntimeZipPackState.apply(materialized),
+                 * so switching from one ZIP pack to another could make the dry-run resolve the
+                 * new pack's shader ids through the old active runtime namespace. That produced
+                 * errors like:
+                 *   original = vpfx_fake_held_light_glow:composite/final
+                 *   runtime  = vpfxzip_vpfx_bsl_tone_showcase:composite/final
+                 *
+                 * Write the new runtime pack first, apply its runtime namespace, then run native
+                 * diagnostics against the current materialized state.
+                 */
                 RuntimeZipPackMaterializationResult materialized = backend.materialize(
                         activePack,
                         Minecraft.getInstance().gameDirectory.toPath()
@@ -159,6 +148,32 @@ public final class ActivePostEffectBridge {
                 VpfxRuntimeTextureBootstrap.registerRuntimeTextureManifest(
                         materialized.runtimeTextureManifestPath()
                 );
+
+                if (activePack.isVpfxNativePack()
+                        && activePack.vpfxDefinition() != null
+                        && backend.capabilities().nativeRuntime()) {
+                    VpfxNativePackDefinition vpfxDef = activePack.vpfxDefinition();
+                    try {
+                        VpfxNativeRuntimeSupport.runDryRunCheck(vpfxDef.getManifest(), vpfxDef.getGraph());
+                        VpfxNativeFullscreenDryRun.run(Minecraft.getInstance(), vpfxDef.getManifest(), vpfxDef.getGraph());
+                    } catch (Throwable t) {
+                        nativeFallbackStage = VpfxBackendSelectionResult.STAGE_PREPARE;
+                        nativeFallbackReason = "native backend preparation failed after materialization: "
+                                + (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
+                        backend = new VpfxPostChainBackend();
+                        PostFxRuntimeState.setActiveRuntimeBackend(backend);
+
+                        VulkanPostFX.LOGGER.warn(
+                                "[{}] VPFX native backend preparation failed after runtime namespace activation. Falling back to minecraft_postchain without marking the pack failed: pack='{}', runtimeNamespace={}, stage={}, reason={}",
+                                VulkanPostFX.MOD_ID,
+                                activePack.manifest().name(),
+                                materialized.runtimeNamespace(),
+                                nativeFallbackStage,
+                                nativeFallbackReason,
+                                t
+                        );
+                    }
+                }
 
                 PostFxRuntimeState.setActiveExternalPostEffectId(materialized.externalPostEffectId());
                 PostFxRuntimeState.setActiveEffectKey("external_zip");

@@ -14,6 +14,7 @@ import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.resources.Identifier;
 
@@ -603,6 +604,20 @@ public final class VpfxNativeUserShaderDryRun {
 			return;
 		}
 
+		if (!runtimeShaderSourceAvailable(vertexShaderId, true)
+				|| !runtimeShaderSourceAvailable(fragmentShaderId, false)) {
+			VulkanPostFX.LOGGER.warn(
+					"[{}] VPFX NR-1F-C.2: user shader RenderPipeline create skipped — "
+							+ "runtime shader source is not loaded in Minecraft ResourceManager yet. "
+							+ "This is a transient resource-reload state and will not be cached as a pipeline failure. vs={}, fs={}",
+					VulkanPostFX.MOD_ID,
+					vertexShaderId,
+					fragmentShaderId
+			);
+			logCacheAwareResult(false, false, false, false, true);
+			return;
+		}
+
 		VpfxNativePipelineKey userKey = new VpfxNativePipelineKey(
 				manifest.getPackId(),
 				passDef.identityOrIndex(0),
@@ -820,6 +835,20 @@ public final class VpfxNativeUserShaderDryRun {
 		Identifier vertexShaderId = Identifier.fromNamespaceAndPath(runtimeNamespace, vertexShaderPath);
 		Identifier fragmentShaderId = Identifier.fromNamespaceAndPath(runtimeNamespace, fragmentShaderPath);
 
+		if (!runtimeShaderSourceAvailable(vertexShaderId, true)
+				|| !runtimeShaderSourceAvailable(fragmentShaderId, false)) {
+			String message = "runtime shader source unavailable; Minecraft resource reload required before native pipeline creation: "
+					+ "vs=" + vertexShaderId + ", fs=" + fragmentShaderId;
+			return VpfxNativeUserPipelineResolveResult.builder()
+					.attempted(true)
+					.fallbackReason(message)
+					.failureStage(VpfxNativeFailureStage.USER_PIPELINE_RESOLVE)
+					.failureMessage(message)
+					.vertexShaderId(vertexShaderId)
+					.fragmentShaderId(fragmentShaderId)
+					.build();
+		}
+
 		String vertexHash = "";
 		String fragmentHash = "";
 
@@ -913,6 +942,23 @@ public final class VpfxNativeUserShaderDryRun {
 					.failureMessage("RenderPipeline.builder().build() threw: " + t.getMessage())
 					.build();
 		}
+	}
+
+	private static boolean runtimeShaderSourceAvailable(Identifier shaderId, boolean vertex) {
+		if (shaderId == null) {
+			return false;
+		}
+
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft == null || minecraft.getResourceManager() == null) {
+			return false;
+		}
+
+		Identifier sourceId = Identifier.fromNamespaceAndPath(
+				shaderId.getNamespace(),
+				"shaders/" + shaderId.getPath() + (vertex ? ".vsh" : ".fsh")
+		);
+		return minecraft.getResourceManager().getResource(sourceId).isPresent();
 	}
 
 	/**

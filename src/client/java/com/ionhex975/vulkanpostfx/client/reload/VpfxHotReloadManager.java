@@ -9,6 +9,8 @@ import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeFullscreen
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeUserPipelineCache;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeUserShaderDryRun;
 import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.VpfxNativeTransientTargetDryRun;
+import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph.VpfxNativeFrameGraphPipelineCache;
+import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph.VpfxNativeHistoryTargetStore;
 import com.ionhex975.vulkanpostfx.client.runtime.zip.RuntimeZipPackLocator;
 import com.ionhex975.vulkanpostfx.client.runtime.zip.RuntimeZipPackState;
 import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
@@ -158,18 +160,21 @@ public final class VpfxHotReloadManager {
 
                 ShaderPackContainer activePack = ActiveShaderPackManager.getActivePack();
                 boolean effectiveEnableAfterReload = resolveEffectiveEnableAfterReload(activePack, enableShaderAfterReload, reason);
+                boolean runtimePackResourceLoadRequired = requiresMinecraftResourceReload(activePack)
+                        && !RuntimeZipPackState.isMinecraftResourceReloadedWithRuntimePack();
                 boolean postChainHardReloadRequired = requiresMinecraftResourceReload(activePack)
-                        && PostFxRuntimeState.activeRuntimeBackendUsesPostChain();
+                        && (PostFxRuntimeState.activeRuntimeBackendUsesPostChain() || runtimePackResourceLoadRequired);
 
                 if (!postChainHardReloadRequired) {
                     applyPostReloadEnableState(effectiveEnableAfterReload);
 
                     VulkanPostFX.LOGGER.info(
-                            "[{}] VPFX safe-load reload completed without Minecraft resource reload: activePack='{}', source='{}', backend={}, shaderEnabled={}",
+                            "[{}] VPFX safe-load reload completed without Minecraft resource reload: activePack='{}', source='{}', backend={}, runtimePackLoaded={}, shaderEnabled={}",
                             VulkanPostFX.MOD_ID,
                             activePack == null ? "none" : activePack.manifest().name(),
                             activePack == null ? "none" : activePack.sourceId(),
                             PostFxRuntimeState.getActiveRuntimeBackendId(),
+                            RuntimeZipPackState.isMinecraftResourceReloadedWithRuntimePack(),
                             PostFxRuntimeState.isDebugEffectEnabled()
                     );
                     result.complete(null);
@@ -178,7 +183,7 @@ public final class VpfxHotReloadManager {
 
                 if (isWorldLoaded(client) && !isInWorldHardReloadAllowed()) {
                     VulkanPostFX.LOGGER.warn(
-                            "[{}] VPFX hard resource reload blocked in-world: activePack='{}', source='{}', backend={}, runtimeRoot={}, externalPostEffectId={}. "
+                            "[{}] VPFX hard resource reload blocked in-world: activePack='{}', source='{}', backend={}, runtimePackLoaded={}, runtimeRoot={}, externalPostEffectId={}. "
                                     + "Keeping the pack active and deferring Minecraft PostChain resource reload to avoid a resource-load disconnect. "
                                     + "Native execution may still run; if PostChain resources are not loaded yet, rendering will temporarily stay vanilla. "
                                     + "Leave the world or return to the title screen before reloading this PostChain fallback. "
@@ -187,6 +192,7 @@ public final class VpfxHotReloadManager {
                             activePack == null ? "none" : activePack.manifest().name(),
                             activePack == null ? "none" : activePack.sourceId(),
                             PostFxRuntimeState.getActiveRuntimeBackendId(),
+                            RuntimeZipPackState.isMinecraftResourceReloadedWithRuntimePack(),
                             RuntimeZipPackState.getRuntimeRoot(),
                             RuntimeZipPackState.getExternalPostEffectId(),
                             ALLOW_IN_WORLD_HARD_RELOAD_PROPERTY
@@ -243,15 +249,17 @@ public final class VpfxHotReloadManager {
                         return;
                     }
 
+                    RuntimeZipPackState.markMinecraftResourceReloadCompleted();
                     PostFxRuntimeState.clearFailedExternalPostEffectId();
                     applyPostReloadEnableState(effectiveEnableAfterReload);
 
                     ShaderPackContainer reloadedPack = ActiveShaderPackManager.getActivePack();
                     VulkanPostFX.LOGGER.info(
-                            "[{}] VPFX Minecraft resource reload completed: activePack='{}', source='{}', externalPostEffectId={}, shaderEnabled={}",
+                            "[{}] VPFX Minecraft resource reload completed: activePack='{}', source='{}', runtimePackLoaded={}, externalPostEffectId={}, shaderEnabled={}",
                             VulkanPostFX.MOD_ID,
                             reloadedPack == null ? "none" : reloadedPack.manifest().name(),
                             reloadedPack == null ? "none" : reloadedPack.sourceId(),
+                            RuntimeZipPackState.isMinecraftResourceReloadedWithRuntimePack(),
                             RuntimeZipPackState.getExternalPostEffectId(),
                             PostFxRuntimeState.isDebugEffectEnabled()
                     );
@@ -280,6 +288,8 @@ public final class VpfxHotReloadManager {
         ActiveShaderPackManager.bootstrap();
 
         VpfxNativeUserPipelineCache.clear();
+        VpfxNativeFrameGraphPipelineCache.clear();
+        VpfxNativeHistoryTargetStore.clearAll();
         VpfxNativeFullscreenExecutor.invalidatePipeline();
 
         PostFxRuntimeState.clearPendingNativeRuntimeChecks();
@@ -292,7 +302,7 @@ public final class VpfxHotReloadManager {
 
         ShaderPackContainer activePack = ActiveShaderPackManager.getActivePack();
         VulkanPostFX.LOGGER.info(
-                "[{}] VPFX safe-load preparation completed: reason={}, activePack='{}', source='{}', backend={}, runtimePackActive={}, runtimePackReady={}, runtimeNamespace='{}', runtimeRoot={}, externalPostEffectId={}, discovered={}, configMode={}",
+                "[{}] VPFX safe-load preparation completed: reason={}, activePack='{}', source='{}', backend={}, runtimePackActive={}, runtimePackReady={}, runtimePackProfileId='{}', runtimeNamespace='{}', runtimeRoot={}, externalPostEffectId={}, discovered={}, configMode={}",
                 VulkanPostFX.MOD_ID,
                 reason,
                 activePack == null ? "none" : activePack.manifest().name(),
@@ -300,6 +310,7 @@ public final class VpfxHotReloadManager {
                 PostFxRuntimeState.getActiveRuntimeBackendId(),
                 RuntimeZipPackState.isActive(),
                 RuntimeZipPackLocator.isMaterializedPackReady(),
+                RuntimeZipPackState.getPackId(),
                 RuntimeZipPackState.getRuntimeNamespace(),
                 RuntimeZipPackState.getRuntimeRoot(),
                 RuntimeZipPackState.getExternalPostEffectId(),

@@ -1,6 +1,11 @@
 package com.ionhex975.vulkanpostfx.client.command;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
+import com.ionhex975.vulkanpostfx.client.diagnostics.doctor.VpfxDoctorFormatter;
+import com.ionhex975.vulkanpostfx.client.diagnostics.exporter.VpfxDiagnosticExportResult;
+import com.ionhex975.vulkanpostfx.client.diagnostics.exporter.VpfxDiagnosticExportService;
+import com.ionhex975.vulkanpostfx.client.diagnostics.doctor.VpfxDoctorReport;
+import com.ionhex975.vulkanpostfx.client.diagnostics.doctor.VpfxDoctorService;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.reload.VpfxHotReloadManager;
@@ -42,6 +47,16 @@ public final class VpfxClientCommands {
                                         .executes(VpfxClientCommands::executeReloadBuiltin)))
                         .then(ClientCommands.literal("list")
                                 .executes(VpfxClientCommands::executeList))
+                        .then(ClientCommands.literal("doctor")
+                                .executes(VpfxClientCommands::executeDoctor)
+                                .then(ClientCommands.literal("copy")
+                                        .executes(VpfxClientCommands::executeDoctorCopy))
+                                .then(ClientCommands.literal("log")
+                                        .executes(VpfxClientCommands::executeDoctorLog)))
+                        .then(ClientCommands.literal("export-diagnostics")
+                                .executes(VpfxClientCommands::executeExportDiagnostics))
+                        .then(ClientCommands.literal("export")
+                                .executes(VpfxClientCommands::executeExportDiagnostics))
                         .then(ClientCommands.literal("off")
                                 .executes(VpfxClientCommands::executeOff))
         ));
@@ -59,6 +74,8 @@ public final class VpfxClientCommands {
         sendKey(source, "command.vulkanpostfx.help.reload_auto");
         sendKey(source, "command.vulkanpostfx.help.reload_builtin");
         sendKey(source, "command.vulkanpostfx.help.list");
+        sendKey(source, "command.vulkanpostfx.help.doctor");
+        sendKey(source, "command.vulkanpostfx.help.export_diagnostics");
         sendKey(source, "command.vulkanpostfx.help.off");
         return Command.SINGLE_SUCCESS;
     }
@@ -118,6 +135,62 @@ public final class VpfxClientCommands {
             send(source, Component.literal(prefix + describePack(pack)));
         }
 
+        return Command.SINGLE_SUCCESS;
+    }
+
+
+    private static int executeDoctor(CommandContext<FabricClientCommandSource> context) {
+        try {
+            VpfxDoctorReport report = VpfxDoctorService.createReport();
+            send(context.getSource(), VpfxDoctorFormatter.toChatSummary(report));
+        } catch (Throwable t) {
+            sendKey(context.getSource(), "command.vulkanpostfx.doctor.failed", t.getClass().getSimpleName());
+            VulkanPostFX.LOGGER.error("[{}] /vpfx doctor failed", VulkanPostFX.MOD_ID, t);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int executeDoctorCopy(CommandContext<FabricClientCommandSource> context) {
+        try {
+            VpfxDoctorReport report = VpfxDoctorService.createReport();
+            String text = VpfxDoctorFormatter.toPlainText(report);
+            Minecraft.getInstance().keyboardHandler.setClipboard(text);
+            sendKey(context.getSource(), "command.vulkanpostfx.doctor.copied");
+        } catch (Throwable t) {
+            sendKey(context.getSource(), "command.vulkanpostfx.doctor.failed", t.getClass().getSimpleName());
+            VulkanPostFX.LOGGER.error("[{}] /vpfx doctor copy failed", VulkanPostFX.MOD_ID, t);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int executeDoctorLog(CommandContext<FabricClientCommandSource> context) {
+        try {
+            VpfxDoctorReport report = VpfxDoctorService.createReport();
+            VulkanPostFX.LOGGER.info("\n{}", VpfxDoctorFormatter.toPlainText(report));
+            sendKey(context.getSource(), "command.vulkanpostfx.doctor.logged");
+        } catch (Throwable t) {
+            sendKey(context.getSource(), "command.vulkanpostfx.doctor.failed", t.getClass().getSimpleName());
+            VulkanPostFX.LOGGER.error("[{}] /vpfx doctor log failed", VulkanPostFX.MOD_ID, t);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int executeExportDiagnostics(CommandContext<FabricClientCommandSource> context) {
+        try {
+            VpfxDiagnosticExportResult result = VpfxDiagnosticExportService.exportNow();
+            String absolutePath = result.zipPath().toAbsolutePath().toString();
+            Minecraft.getInstance().keyboardHandler.setClipboard(absolutePath);
+            sendKey(
+                    context.getSource(),
+                    "command.vulkanpostfx.export_diagnostics.complete",
+                    absolutePath,
+                    result.filesWritten(),
+                    result.skippedFiles().size()
+            );
+        } catch (Throwable t) {
+            sendKey(context.getSource(), "command.vulkanpostfx.export_diagnostics.failed", t.getClass().getSimpleName());
+            VulkanPostFX.LOGGER.error("[{}] /vpfx export-diagnostics failed", VulkanPostFX.MOD_ID, t);
+        }
         return Command.SINGLE_SUCCESS;
     }
 

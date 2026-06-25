@@ -167,11 +167,11 @@ public final class VpfxGraphValidator {
             if (!runtimeCapabilities.isSceneDepth()) {
                 messages.add(fatal("G006", inputPath, "Scene depth requested but runtime does not provide it"));
             }
-        } else if ("vulkanpostfx:scene_depth".equals(target)) {
+        } else if ("vulkanpostfx:scene_depth".equals(target) || "minecraft:scene_depth".equals(target)) {
             if (!runtimeCapabilities.isSceneDepth()) {
                 messages.add(fatal("G006", inputPath, "Scene depth requested but runtime does not provide it"));
             }
-        } else if ("vulkanpostfx:shadow_depth".equals(target)) {
+        } else if ("vulkanpostfx:shadow_depth".equals(target) || "minecraft:shadow_depth".equals(target)) {
             if (!runtimeCapabilities.isShadowDepth()) {
                 messages.add(fatal("G006", inputPath, "Shadow depth requested but runtime does not provide it"));
             }

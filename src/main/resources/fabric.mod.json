@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"id": "vulkanpostfx",
-	"version": "1.15.6+mc26.3-snapshot1-2026-06-25",
+	"version": "1.15.7+mc26.3-snapshot1-2026-06-25",
 	"name": "Vulkan PostFX",
 	"description": "Vulkan backend post-processing proof of concept for Minecraft 26.2 and 26.2 snapshots. Includes VPFX shader pack menu and hot reload workflow.",
 	"authors": [

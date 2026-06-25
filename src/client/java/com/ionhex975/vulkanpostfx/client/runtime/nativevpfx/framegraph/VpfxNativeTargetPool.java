@@ -1,10 +1,14 @@
 package com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthProvider;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthState;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxTargetDefinition;
 import com.ionhex975.vulkanpostfx.client.postfx.SceneDepthCaptureTargets;
 import com.ionhex975.vulkanpostfx.client.runtime.zip.RuntimeZipPackState;
 import com.ionhex975.vulkanpostfx.client.shadow.ShadowRenderTargetsLite;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthProvider;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthState;
 import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
@@ -148,7 +152,8 @@ public final class VpfxNativeTargetPool implements AutoCloseable {
 
     private void registerSceneDepthInputIfReady() {
         SceneDepthCaptureTargets sceneDepth = SceneDepthCaptureTargets.get();
-        if (!sceneDepth.isReady() || sceneDepth.getSceneDepthTarget() == null) {
+        VpfxSceneDepthState depthState = VpfxSceneDepthProvider.currentState();
+        if (!sceneDepth.isReady() || !depthState.available() || sceneDepth.getSceneDepthTarget() == null) {
             return;
         }
 
@@ -191,7 +196,8 @@ public final class VpfxNativeTargetPool implements AutoCloseable {
 
     private void registerShadowDepthInputIfReady() {
         ShadowRenderTargetsLite shadowTargets = ShadowRenderTargetsLite.get();
-        if (!shadowTargets.isReady() || shadowTargets.getShadowDepthTarget() == null) {
+        VpfxShadowDepthState shadowDepthState = VpfxShadowDepthProvider.currentState();
+        if (!shadowTargets.isReady() || !shadowDepthState.available() || shadowTargets.getShadowDepthTarget() == null) {
             return;
         }
 

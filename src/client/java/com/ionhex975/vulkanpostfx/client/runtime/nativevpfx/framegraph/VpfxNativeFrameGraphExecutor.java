@@ -1,6 +1,8 @@
 package com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.framegraph;
 
 import com.ionhex975.vulkanpostfx.VulkanPostFX;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthProvider;
+import com.ionhex975.vulkanpostfx.client.depth.VpfxSceneDepthState;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxGraphDefinition;
@@ -13,6 +15,8 @@ import com.ionhex975.vulkanpostfx.client.runtime.nativevpfx.graph.VpfxNativePass
 import com.ionhex975.vulkanpostfx.client.runtime.texture.VpfxRuntimeTextureDescriptor;
 import com.ionhex975.vulkanpostfx.client.runtime.texture.VpfxRuntimeTextureRegistry;
 import com.ionhex975.vulkanpostfx.client.runtime.zip.RuntimeZipPackState;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthProvider;
+import com.ionhex975.vulkanpostfx.client.shadow.VpfxShadowDepthState;
 import com.ionhex975.vulkanpostfx.client.shader.uniform.VpfxBuiltinUniformBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -67,6 +71,27 @@ public final class VpfxNativeFrameGraphExecutor {
         String runtimeNamespace = RuntimeZipPackState.getRuntimeNamespace();
         if (runtimeNamespace == null || runtimeNamespace.isBlank()) {
             return failed("runtime namespace unavailable", VpfxNativeFailureStage.USER_PIPELINE_RESOLVE);
+        }
+
+        VpfxNativeGraphPlanResult planned = plan;
+        if (planned.inputBindings().contains("scene_depth")) {
+            VpfxSceneDepthState depthState = VpfxSceneDepthProvider.currentState();
+            if (!depthState.available()) {
+                return failed(
+                        "scene_depth input requested but scene depth is not available: " + depthState.reason(),
+                        VpfxNativeFailureStage.USER_PIPELINE_RESOLVE
+                );
+            }
+        }
+
+        if (planned.inputBindings().contains("shadow_depth")) {
+            VpfxShadowDepthState shadowDepthState = VpfxShadowDepthProvider.currentState();
+            if (!shadowDepthState.available()) {
+                return failed(
+                        "shadow_depth input requested but shadow depth is not available: " + shadowDepthState.reason(),
+                        VpfxNativeFailureStage.USER_PIPELINE_RESOLVE
+                );
+            }
         }
 
         int executedPasses = 0;

@@ -4,6 +4,7 @@ import com.ionhex975.vulkanpostfx.VulkanPostFX;
 import com.ionhex975.vulkanpostfx.client.diagnostics.VpfxDiagnosticsConfig;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxCapabilityResolver;
 import com.ionhex975.vulkanpostfx.client.pack.vpfx.VpfxRuntimeCapabilities;
+import com.ionhex975.vulkanpostfx.client.state.PostFxRuntimeState;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -26,6 +27,7 @@ public final class ShadowDepthPassLite {
 
         VpfxRuntimeCapabilities caps = new VpfxCapabilityResolver().resolve();
         if (!caps.isShadowDepth()) {
+            VpfxShadowDepthProvider.markUnavailable("shadow_depth capability is disabled");
             return;
         }
 
@@ -33,15 +35,22 @@ public final class ShadowDepthPassLite {
         ShadowRenderTargetsLite targets = ShadowRenderTargetsLite.get();
 
         if (!state.isValid() || !state.isShadowPassEnabled() || !state.isShadowTargetReady() || !targets.isReady()) {
+            VpfxShadowDepthProvider.markUnavailable("shadow pass prerequisites are not ready: valid="
+                    + state.isValid()
+                    + ", enabled=" + state.isShadowPassEnabled()
+                    + ", targetReady=" + state.isShadowTargetReady()
+                    + ", targetsReady=" + targets.isReady());
             return;
         }
 
         if (!state.consumeShadowRenderRequest()) {
+            VpfxShadowDepthProvider.markPrepared(state);
             return;
         }
 
         RenderTarget target = targets.getShadowDepthTarget();
         if (target == null) {
+            VpfxShadowDepthProvider.markUnavailable("shadow render target is null");
             return;
         }
 
@@ -78,6 +87,7 @@ public final class ShadowDepthPassLite {
             boolean castersRendered = terrainRendered || entitySubmitted > 0;
 
             state.markShadowPassExecuted(castersRendered);
+            VpfxShadowDepthProvider.markPassExecuted(state, castersRendered, PostFxRuntimeState.currentFrameEpoch());
 
             boolean stateChanged =
                     lastLoggedTerrainRendered == null
@@ -106,6 +116,7 @@ public final class ShadowDepthPassLite {
                 );
             }
         } catch (Throwable t) {
+            VpfxShadowDepthProvider.markUnavailable("shadow depth pass failed: " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));
             VulkanPostFX.LOGGER.error(
                     "[{}] Shadow depth pass execution failed",
                     VulkanPostFX.MOD_ID,

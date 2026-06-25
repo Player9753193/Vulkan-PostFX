@@ -9,6 +9,7 @@ import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.resources.Identifier;
 
@@ -54,6 +55,8 @@ public final class VpfxNativeFrameGraphPipelineCache {
                     extractShaderPath(pass.fragmentShaderRef())
             );
 
+            verifyRuntimeShaderSourceAvailable(vertexShaderId, fragmentShaderId);
+
             BindGroupLayout samplerLayout = buildSamplerLayout(pass);
 
             RenderPipeline pipeline = RenderPipeline.builder()
@@ -80,9 +83,12 @@ public final class VpfxNativeFrameGraphPipelineCache {
             );
             return pipeline;
         } catch (Throwable t) {
-            FAILURE_CACHE.put(key, t.getMessage());
+            String message = t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName();
+            if (!isTransientResourceLoadFailure(message)) {
+                FAILURE_CACHE.put(key, message);
+            }
             throw new IllegalStateException(
-                    "failed to create native framegraph pipeline for pass '" + pass.passId() + "': " + t.getMessage(),
+                    "failed to create native framegraph pipeline for pass '" + pass.passId() + "': " + message,
                     t
             );
         }
@@ -91,6 +97,37 @@ public final class VpfxNativeFrameGraphPipelineCache {
     public static void clear() {
         SUCCESS_CACHE.clear();
         FAILURE_CACHE.clear();
+    }
+
+    private static void verifyRuntimeShaderSourceAvailable(Identifier vertexShaderId, Identifier fragmentShaderId) {
+        if (!runtimeShaderSourceAvailable(vertexShaderId, true)
+                || !runtimeShaderSourceAvailable(fragmentShaderId, false)) {
+            throw new IllegalStateException(
+                    "runtime shader source unavailable; Minecraft resource reload required before native pipeline creation: "
+                            + "vs=" + vertexShaderId + ", fs=" + fragmentShaderId
+            );
+        }
+    }
+
+    private static boolean runtimeShaderSourceAvailable(Identifier shaderId, boolean vertex) {
+        if (shaderId == null) {
+            return false;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.getResourceManager() == null) {
+            return false;
+        }
+
+        Identifier sourceId = Identifier.fromNamespaceAndPath(
+                shaderId.getNamespace(),
+                "shaders/" + shaderId.getPath() + (vertex ? ".vsh" : ".fsh")
+        );
+        return minecraft.getResourceManager().getResource(sourceId).isPresent();
+    }
+
+    private static boolean isTransientResourceLoadFailure(String message) {
+        return message != null && message.contains("runtime shader source unavailable");
     }
 
     private static VpfxNativePipelineKey createKey(String packId, VpfxNativePassNode pass) {
