@@ -1,0 +1,27 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "colored_light_raymarch",
+      "debug_label": "Colored Light Raymarch",
+      "vertex_shader": "vpfx_colored_light_raymarch:composite/final",
+      "fragment_shader": "vpfx_colored_light_raymarch:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:scene_color"
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "vulkanpostfx:scene_depth",
+          "use_depth_buffer": true
+        },
+        {
+          "sampler_name": "ColoredLightVolume",
+          "texture": "colored_light_volume"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

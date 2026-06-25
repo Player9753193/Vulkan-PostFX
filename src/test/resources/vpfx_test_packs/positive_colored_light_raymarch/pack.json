@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "pack_id": "vpfx_colored_light_raymarch",
+  "name": "VPFX Colored Light Raymarch",
+  "version": "1.0.0",
+  "author": "VPFX Team",
+  "description": "Official VPFX colored-light raymarch prototype. Uses scene depth and the CPU-built colored_light_volume atlas to accumulate colored volumetric light along the view ray.",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": true,
+    "scene_depth": true,
+    "shadow_depth": false,
+    "custom_targets": false,
+    "compute": false
+  }
+}
