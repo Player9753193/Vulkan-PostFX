@@ -9,6 +9,7 @@ This directory contains test packs for VPFX v1 pack validation.
 | `positive_minimal` | ✅ Positive | Loads successfully (code=OK) |
 | `positive_depth_debug` | ✅ Positive | Samples `vulkanpostfx:scene_depth` and displays raw depth |
 | `positive_depth_fog` | ✅ Positive | Samples scene color + scene depth and applies distance fog |
+| `positive_colored_light_raymarch` | ✅ Positive | Samples scene color + scene depth + `colored_light_volume` and applies colored-light raymarch |
 | `negative_future_dependency` | ❌ Negative | G017 — reads unwritten future target |
 | `negative_invalid_pack_id` | ❌ Negative | F003 — invalid pack_id pattern |
 | `negative_missing_entry` | ❌ Negative | F005 — entry_post_effect not found |
