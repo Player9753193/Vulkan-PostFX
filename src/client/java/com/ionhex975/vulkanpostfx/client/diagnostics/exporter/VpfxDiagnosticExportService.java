@@ -500,6 +500,12 @@ public final class VpfxDiagnosticExportService {
         sb.append("buildTimeMs: ").append("%.3f".formatted(state.lastBuildNanos() / 1_000_000.0D)).append('\n');
         sb.append("sourceLightCount: ").append(state.sourceLightCount()).append('\n');
         sb.append("contributingVoxels: ").append(state.contributingLightCount()).append('\n');
+        sb.append("occlusionEnabled: ").append(state.occlusionEnabled()).append('\n');
+        sb.append("occlusionRays: ").append(state.occlusionRayCount()).append('\n');
+        sb.append("occludedRays: ").append(state.occlusionBlockedRayCount()).append('\n');
+        sb.append("occlusionSamples: ").append(state.occlusionSampleCount()).append('\n');
+        sb.append("averageOcclusionTransmission: ").append("%.3f".formatted(state.averageOcclusionTransmission())).append('\n');
+        sb.append("occlusionSummary: ").append(state.occlusionSummary()).append('\n');
         sb.append("maxRgba: ").append(state.maxRgbString()).append('\n');
         sb.append("reason: ").append(safe(state.reason())).append('\n');
     }

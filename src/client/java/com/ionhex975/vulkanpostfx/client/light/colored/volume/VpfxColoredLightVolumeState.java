@@ -27,6 +27,11 @@ public record VpfxColoredLightVolumeState(
         long lastBuildNanos,
         int sourceLightCount,
         int contributingLightCount,
+        boolean occlusionEnabled,
+        int occlusionRayCount,
+        int occlusionBlockedRayCount,
+        int occlusionSampleCount,
+        float averageOcclusionTransmission,
         float maxRed,
         float maxGreen,
         float maxBlue,
@@ -52,6 +57,11 @@ public record VpfxColoredLightVolumeState(
                 0L,
                 0,
                 0,
+                VpfxColoredLightVolumeAtlas.OCCLUSION_ENABLED,
+                0,
+                0,
+                0,
+                1.0F,
                 0.0F,
                 0.0F,
                 0.0F,
@@ -92,8 +102,19 @@ public record VpfxColoredLightVolumeState(
                 + ", atlas=" + atlasSizeString()
                 + ", volume=" + volumeSizeString()
                 + ", lights=" + contributingLightCount + "/" + sourceLightCount
+                + ", occlusion=" + occlusionSummary()
                 + ", frame=" + frameEpoch
                 + ", origin=" + originString()
                 + ", reason=" + reason;
+    }
+
+    public String occlusionSummary() {
+        if (!occlusionEnabled) {
+            return "disabled";
+        }
+        return "rays=" + occlusionRayCount
+                + ", blocked=" + occlusionBlockedRayCount
+                + ", samples=" + occlusionSampleCount
+                + ", avgTransmission=" + "%.3f".formatted(averageOcclusionTransmission);
     }
 }

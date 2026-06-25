@@ -82,6 +82,9 @@ public final class VpfxDebugHud {
 		graphics.text(client.font, tr("vulkanpostfx.hud.colored_lights", coloredLightsLabel()), BASE_X, y, COLOR_LABEL);
 		y += LINE_HEIGHT;
 
+		graphics.text(client.font, tr("vulkanpostfx.hud.colored_light_volume", coloredLightVolumeLabel()), BASE_X, y, COLOR_LABEL);
+		y += LINE_HEIGHT;
+
 		if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
 			graphics.text(client.font, tr("vulkanpostfx.hud.native_fallback", fallbackLabel()), BASE_X, y, COLOR_WARN);
 			y += LINE_HEIGHT;
@@ -272,6 +275,18 @@ public final class VpfxDebugHud {
 				+ " raw=" + snapshot.rawLightCount()
 				+ " radius=" + snapshot.scanRadius()
 				+ " origin=" + snapshot.originString());
+	}
+
+	private static String coloredLightVolumeLabel() {
+		VpfxColoredLightVolumeState state = VpfxColoredLightVolumeAtlas.currentState();
+		if (state == null || !state.atlasReady()) {
+			return clamp("unavailable: " + (state == null ? "no state" : state.reason()));
+		}
+		return clamp("atlas=" + state.atlasSizeString()
+				+ " volume=" + state.volumeSizeString()
+				+ " lights=" + state.sourceLightCount()
+				+ " voxels=" + state.contributingLightCount()
+				+ " occlusion=" + state.occlusionSummary());
 	}
 
 	private static String activeSourceLabel() {

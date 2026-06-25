@@ -329,6 +329,13 @@ public final class VpfxDoctorService {
         checks.add(VpfxDoctorCheck.info("colored_light_volume_build_time_ms", "Last build time ms", "%.3f".formatted(state.lastBuildNanos() / 1_000_000.0D)));
         checks.add(VpfxDoctorCheck.info("colored_light_volume_source_lights", "Source light count", state.sourceLightCount()));
         checks.add(VpfxDoctorCheck.info("colored_light_volume_contributing_voxels", "Contributing voxels", state.contributingLightCount()));
+        checks.add(state.occlusionEnabled()
+                ? VpfxDoctorCheck.ok("colored_light_volume_occlusion", "Occlusion", state.occlusionSummary())
+                : VpfxDoctorCheck.info("colored_light_volume_occlusion", "Occlusion", "disabled"));
+        checks.add(VpfxDoctorCheck.info("colored_light_volume_occlusion_rays", "Occlusion rays", state.occlusionRayCount()));
+        checks.add(VpfxDoctorCheck.info("colored_light_volume_occlusion_blocked", "Occluded rays", state.occlusionBlockedRayCount()));
+        checks.add(VpfxDoctorCheck.info("colored_light_volume_occlusion_samples", "Occlusion samples", state.occlusionSampleCount()));
+        checks.add(VpfxDoctorCheck.info("colored_light_volume_occlusion_avg", "Average transmission", "%.3f".formatted(state.averageOcclusionTransmission())));
         checks.add(VpfxDoctorCheck.info("colored_light_volume_max_rgba", "Max atlas RGBA", state.maxRgbString()));
         checks.add(VpfxDoctorCheck.info("colored_light_volume_reason", "Colored light volume reason", state.reason()));
         return new VpfxDoctorSection("Colored Light Volume", checks);

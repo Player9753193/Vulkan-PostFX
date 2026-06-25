@@ -11,6 +11,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 
@@ -29,6 +32,10 @@ public final class VpfxColoredLightVolumeAtlas {
     public static final int ATLAS_WIDTH = VOLUME_SIZE_X * TILES_PER_ROW;
     public static final int ATLAS_HEIGHT = VOLUME_SIZE_Z * ((VOLUME_SIZE_Y + TILES_PER_ROW - 1) / TILES_PER_ROW);
     public static final float VOXEL_WORLD_SIZE = 1.5F;
+    public static final boolean OCCLUSION_ENABLED = true;
+    public static final int OCCLUSION_MAX_STEPS = 10;
+    public static final float OCCLUSION_SOLID_TRANSMISSION = 0.18F;
+    public static final float OCCLUSION_MIN_TRANSMISSION = 0.035F;
     public static final Identifier TEXTURE_ID = Identifier.fromNamespaceAndPath(VulkanPostFX.MOD_ID, VpfxRuntimeTextureBus.COLORED_LIGHT_VOLUME);
 
     private static DynamicTexture texture;
@@ -39,6 +46,7 @@ public final class VpfxColoredLightVolumeAtlas {
     private static int lastOriginY = Integer.MIN_VALUE;
     private static int lastOriginZ = Integer.MIN_VALUE;
     private static boolean textureRegistered;
+    private static final ThreadLocal<BlockPos.MutableBlockPos> OCCLUSION_SAMPLE_POS = ThreadLocal.withInitial(BlockPos.MutableBlockPos::new);
 
     private VpfxColoredLightVolumeAtlas() {
     }
@@ -84,7 +92,7 @@ public final class VpfxColoredLightVolumeAtlas {
         }
 
         ensureTexture(minecraft);
-        buildAtlas(snapshot);
+        buildAtlas(minecraft.level, snapshot);
         texture.upload();
 
         lastBuiltCollectorFrame = snapshot.frameEpoch();
@@ -147,6 +155,11 @@ public final class VpfxColoredLightVolumeAtlas {
                 0L,
                 0,
                 0,
+                OCCLUSION_ENABLED,
+                0,
+                0,
+                0,
+                1.0F,
                 0.0F,
                 0.0F,
                 0.0F,
@@ -163,7 +176,7 @@ public final class VpfxColoredLightVolumeAtlas {
         );
     }
 
-    private static void buildAtlas(VpfxColoredLightSnapshot snapshot) {
+    private static void buildAtlas(Level level, VpfxColoredLightSnapshot snapshot) {
         long startNanos = System.nanoTime();
         List<VpfxColoredLightInfo> lights = snapshot.lights();
         double originX = snapshot.originX() + 0.5D - (VOLUME_SIZE_X * VOXEL_WORLD_SIZE) * 0.5D;
@@ -171,6 +184,7 @@ public final class VpfxColoredLightVolumeAtlas {
         double originZ = snapshot.originZ() + 0.5D - (VOLUME_SIZE_Z * VOXEL_WORLD_SIZE) * 0.5D;
 
         int contributing = 0;
+        OcclusionStats occlusionStats = new OcclusionStats();
         float maxR = 0.0F;
         float maxG = 0.0F;
         float maxB = 0.0F;
@@ -204,7 +218,13 @@ public final class VpfxColoredLightVolumeAtlas {
                         float dist = (float) Math.sqrt(distSq);
                         float falloff = 1.0F - dist / radius;
                         falloff = falloff * falloff;
-                        float energy = light.intensity() * falloff;
+
+                        float transmission = occlusionTransmission(level, light, lx, ly, lz, wx, wy, wz, dist, occlusionStats);
+                        if (transmission <= OCCLUSION_MIN_TRANSMISSION) {
+                            continue;
+                        }
+
+                        float energy = light.intensity() * falloff * transmission;
 
                         r += light.red() * energy;
                         g += light.green() * energy;
@@ -246,6 +266,11 @@ public final class VpfxColoredLightVolumeAtlas {
                 elapsed,
                 snapshot.lightCount(),
                 contributing,
+                OCCLUSION_ENABLED,
+                occlusionStats.rayCount,
+                occlusionStats.blockedRayCount,
+                occlusionStats.sampleCount,
+                occlusionStats.averageTransmission(),
                 maxR,
                 maxG,
                 maxB,
@@ -253,6 +278,85 @@ public final class VpfxColoredLightVolumeAtlas {
                 TEXTURE_ID,
                 snapshot.lightCount() == 0 ? "blank atlas" : "ok"
         );
+    }
+
+    private static float occlusionTransmission(
+            Level level,
+            VpfxColoredLightInfo light,
+            double lightX,
+            double lightY,
+            double lightZ,
+            double sampleX,
+            double sampleY,
+            double sampleZ,
+            float distance,
+            OcclusionStats stats
+    ) {
+        if (!OCCLUSION_ENABLED || level == null || distance < 2.25F || light.source().contains("hand")) {
+            return 1.0F;
+        }
+
+        stats.rayCount++;
+
+        int steps = Math.max(2, Math.min(OCCLUSION_MAX_STEPS, (int) Math.ceil(distance / 1.35F)));
+        double stepX = (sampleX - lightX) / (double) steps;
+        double stepY = (sampleY - lightY) / (double) steps;
+        double stepZ = (sampleZ - lightZ) / (double) steps;
+
+        float transmission = 1.0F;
+        boolean blocked = false;
+        BlockPos.MutableBlockPos mutablePos = OCCLUSION_SAMPLE_POS.get();
+
+        for (int i = 1; i < steps; i++) {
+            double px = lightX + stepX * i;
+            double py = lightY + stepY * i;
+            double pz = lightZ + stepZ * i;
+            int bx = (int) Math.floor(px);
+            int by = (int) Math.floor(py);
+            int bz = (int) Math.floor(pz);
+
+            // Do not let the emitter block itself shadow the entire volume.
+            if (bx == light.blockX() && by == light.blockY() && bz == light.blockZ()) {
+                continue;
+            }
+
+            stats.sampleCount++;
+            mutablePos.set(bx, by, bz);
+            BlockState state = level.getBlockState(mutablePos);
+            float blocker = blockerStrength(state);
+            if (blocker <= 0.001F) {
+                continue;
+            }
+
+            blocked = true;
+            transmission *= Math.max(0.0F, 1.0F - blocker);
+            if (transmission <= OCCLUSION_MIN_TRANSMISSION) {
+                transmission = 0.0F;
+                break;
+            }
+        }
+
+        if (blocked) {
+            stats.blockedRayCount++;
+        }
+        stats.transmissionSum += transmission;
+        return transmission;
+    }
+
+    private static float blockerStrength(BlockState state) {
+        if (state == null || state.isAir()) {
+            return 0.0F;
+        }
+        if (state.isSolidRender()) {
+            return 1.0F - OCCLUSION_SOLID_TRANSMISSION;
+        }
+        if (state.canOcclude()) {
+            return 0.48F;
+        }
+        if (state.getLightEmission() > 0) {
+            return 0.0F;
+        }
+        return 0.18F;
     }
 
     private static void setVoxel(int x, int y, int z, float red, float green, float blue, float alpha) {
@@ -288,4 +392,18 @@ public final class VpfxColoredLightVolumeAtlas {
         float clamped = Math.max(0.0F, Math.min(1.0F, value));
         return Math.max(0, Math.min(255, Math.round(clamped * 255.0F)));
     }
+    private static final class OcclusionStats {
+        int rayCount;
+        int blockedRayCount;
+        int sampleCount;
+        double transmissionSum;
+
+        float averageTransmission() {
+            if (rayCount <= 0) {
+                return 1.0F;
+            }
+            return (float) Math.max(0.0D, Math.min(1.0D, transmissionSum / (double) rayCount));
+        }
+    }
+
 }
