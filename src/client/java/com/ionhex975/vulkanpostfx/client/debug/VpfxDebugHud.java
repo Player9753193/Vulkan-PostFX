@@ -1,5 +1,7 @@
 package com.ionhex975.vulkanpostfx.client.debug;
 
+import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightInfo;
+import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightProvider;
 import com.ionhex975.vulkanpostfx.client.pack.ActiveShaderPackManager;
 import com.ionhex975.vulkanpostfx.client.pack.ShaderPackContainer;
 import com.ionhex975.vulkanpostfx.client.runtime.ActivePostEffectBridge;
@@ -11,6 +13,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
+
+import java.util.Locale;
 
 /**
  * Lightweight VPFX runtime HUD.
@@ -59,6 +63,9 @@ public final class VpfxDebugHud {
 		y += LINE_HEIGHT;
 
 		graphics.text(client.font, tr("vulkanpostfx.hud.effect", activeEffectLabel()), BASE_X, y, COLOR_INFO);
+		y += LINE_HEIGHT;
+
+		graphics.text(client.font, tr("vulkanpostfx.hud.held_light", heldLightLabel()), BASE_X, y, COLOR_LABEL);
 		y += LINE_HEIGHT;
 
 		if (PostFxRuntimeState.isNativeRuntimeFallbackActive()) {
@@ -199,6 +206,20 @@ public final class VpfxDebugHud {
 
 	private static String fallbackLabel() {
 		return clamp(PostFxRuntimeState.getNativeRuntimeFallbackSummary());
+	}
+
+	private static String heldLightLabel() {
+		VpfxHeldLightInfo heldLight = VpfxHeldLightProvider.currentHeldLight();
+		if (heldLight == null || !heldLight.enabled()) {
+			return tr("vulkanpostfx.common.none");
+		}
+		return clamp(String.format(Locale.ROOT, "%s rgb=%.2f/%.2f/%.2f intensity=%.2f radius=%.2f",
+				heldLight.debugName(),
+				heldLight.red(),
+				heldLight.green(),
+				heldLight.blue(),
+				heldLight.intensity(),
+				heldLight.radius()));
 	}
 
 	private static String activeSourceLabel() {

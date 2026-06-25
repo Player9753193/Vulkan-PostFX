@@ -168,5 +168,6 @@
   "command.vulkanpostfx.list.active": "Aktiv: %s",
   "command.vulkanpostfx.off.done": "VPFX deaktiviert. Vanilla-Rendering wurde angefordert.",
   "command.vulkanpostfx.reload.failed": "VPFX-Neuladen ist sicher fehlgeschlagen. Vanilla-Rendering wurde angefordert. Prüfe latest.log.",
-  "command.vulkanpostfx.reload.complete": "VPFX-Neuladen abgeschlossen. Aktiv: %s"
+  "command.vulkanpostfx.reload.complete": "VPFX-Neuladen abgeschlossen. Aktiv: %s",
+  "vulkanpostfx.hud.held_light": "Handlicht: %s"
 }

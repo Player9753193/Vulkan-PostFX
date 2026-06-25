@@ -33,11 +33,13 @@ public final class BuiltinShaderPackSource implements ShaderPackSource {
         resources.add("assets/vulkanpostfx/post_effect/debug_invert.json");
         resources.add("assets/vulkanpostfx/post_effect/debug_grayscale.json");
         resources.add("assets/vulkanpostfx/post_effect/debug_shadow_depth.json");
+        resources.add("assets/vulkanpostfx/post_effect/debug_held_light_glow.json");
         resources.add("assets/vulkanpostfx/shaders/post/fullscreen.vsh");
         resources.add("assets/vulkanpostfx/shaders/post/invert.fsh");
         resources.add("assets/vulkanpostfx/shaders/post/blit.fsh");
         resources.add("assets/vulkanpostfx/shaders/post/grayscale.fsh");
         resources.add("assets/vulkanpostfx/shaders/post/shadow_depth_debug.fsh");
+        resources.add("assets/vulkanpostfx/shaders/post/fake_held_light_glow.fsh");
 
         ShaderPackResourceIndex index = new ShaderPackResourceIndex(resources);
 

@@ -3,11 +3,14 @@ package com.ionhex975.vulkanpostfx.client.shader.uniform;
 /**
  * VPFX builtin uniform 源码注入器。
  *
- * Shadow Apply Debug v1：
- * - 扩展 VpfxBuiltins，加入 SceneDepth 重建和 Shadow Apply 所需矩阵
- * - 提供 helper：
+ * Builtin uniform injection:
+ * - SceneDepth / Shadow Apply matrices
+ * - held-light screen-space glow inputs
+ * - helper functions:
  *   - vpfx_ViewPositionFromRaw(...)
  *   - vpfx_WorldPositionFromRaw(...)
+ *   - vpfx_hasHeldLight()
+ *   - vpfx_applyHeldLightGlow(...)
  */
 public final class VpfxBuiltinUniformSourceInjector {
     private static final String BLOCK = """
@@ -28,6 +31,8 @@ layout(std140) uniform VpfxBuiltins {
     vec4 vpfx_MoonPositionInfo;
     vec4 vpfx_ShadowLightPositionInfo;
     vec4 vpfx_UpPositionInfo;
+    vec4 vpfx_HeldLightColorInfo;
+    vec4 vpfx_HeldLightParamsInfo;
     mat4 gbufferProjection;
     mat4 vpfx_InverseProjectionMatrix;
     mat4 gbufferPreviousProjection;
@@ -80,6 +85,11 @@ layout(std140) uniform VpfxBuiltins {
 #define vpfx_ShadowLightPosition    (vpfx_ShadowLightPositionInfo.xyz)
 #define vpfx_UpPosition             (vpfx_UpPositionInfo.xyz)
 
+#define vpfx_HeldLightColor         (vpfx_HeldLightColorInfo.rgb)
+#define vpfx_HeldLightIntensity     (vpfx_HeldLightColorInfo.a)
+#define vpfx_HeldLightRadius        (vpfx_HeldLightParamsInfo.x)
+#define vpfx_HeldLightEnabled       (vpfx_HeldLightParamsInfo.y > 0.5)
+
 #define vpfx_ProjectionMatrix            (gbufferProjection)
 #define vpfx_PreviousProjectionMatrix    (gbufferPreviousProjection)
 #define vpfx_ViewRotationMatrix          (gbufferModelView)
@@ -108,6 +118,32 @@ layout(std140) uniform VpfxBuiltins {
 #define moonPosition                     (vpfx_MoonPosition)
 #define shadowLightPosition              (vpfx_ShadowLightPosition)
 #define upPosition                       (vpfx_UpPosition)
+
+bool vpfx_hasHeldLight() {
+    return vpfx_HeldLightEnabled && vpfx_HeldLightIntensity > 0.001;
+}
+
+float vpfx_HeldLightRadialMask(vec2 uv, float innerRadius, float outerRadius) {
+    vec2 p = uv * 2.0 - 1.0;
+    p.x *= vpfx_ViewSize.x * vpfx_InvViewSize.y;
+    return 1.0 - smoothstep(innerRadius, outerRadius, length(p));
+}
+
+vec3 vpfx_applyHeldLightGlow(vec2 uv, vec3 color) {
+    if (!vpfx_hasHeldLight()) {
+        return color;
+    }
+
+    float radius = max(vpfx_HeldLightRadius, 0.001);
+    float glow = vpfx_HeldLightRadialMask(uv, 0.05 * radius, 1.35 * radius);
+    glow *= vpfx_HeldLightIntensity;
+
+    vec3 lightColor = vpfx_HeldLightColor;
+    float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    float darkBoost = 1.0 - smoothstep(0.18, 0.82, luminance);
+
+    return color + lightColor * glow * mix(0.045, 0.18, darkBoost);
+}
 
 float vpfx_InternalSafeSignedDenominator(float value) {
     if (abs(value) > 1e-6) {

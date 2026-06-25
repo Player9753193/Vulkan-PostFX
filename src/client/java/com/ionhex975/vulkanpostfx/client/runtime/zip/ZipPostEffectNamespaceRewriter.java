@@ -117,9 +117,9 @@ public final class ZipPostEffectNamespaceRewriter {
             return;
         }
 
-        // 13 * vec4 + 15 * mat4 = 73 vec4 slots。
+        // 15 * vec4 + 15 * mat4 = 75 vec4 slots。
         // 这里的 JSON uniforms 只负责让 PostPass 为 VpfxBuiltins 分到足够大的 GPU buffer。
-        final int vec4SlotCount = 73;
+        final int vec4SlotCount = 75;
 
         JsonArray blockValues = new JsonArray();
 

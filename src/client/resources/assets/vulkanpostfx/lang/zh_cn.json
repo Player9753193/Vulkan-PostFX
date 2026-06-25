@@ -168,5 +168,6 @@
   "command.vulkanpostfx.list.active": "当前：%s",
   "command.vulkanpostfx.off.done": "VPFX 已禁用，已请求原版渲染。",
   "command.vulkanpostfx.reload.failed": "VPFX 安全重载失败，已请求原版渲染。请检查 latest.log。",
-  "command.vulkanpostfx.reload.complete": "VPFX 重载完成。当前：%s"
+  "command.vulkanpostfx.reload.complete": "VPFX 重载完成。当前：%s",
+  "vulkanpostfx.hud.held_light": "手持光源：%s"
 }

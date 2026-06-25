@@ -21,9 +21,10 @@ import java.util.Map;
  * 继续沿用当前正式方案：
  * - 不往 customUniforms 里新塞不存在的 uniform 名
  * - 只更新已经由 JSON uniforms 创建好的 VpfxBuiltins buffer
+ * - 不再要求 pass name 以 vpfxzip_ 开头：任何显式声明 VpfxBuiltins 的 VPFX pass 都可获得同一套内置数据。
  *
- * Linear Depth v1 只是扩展 VpfxBuiltins 的内容，
- * 这里的注入点逻辑本身不需要改。
+ * Fake Held-Light Glow 只是继续扩展 VpfxBuiltins 的内容，
+ * 这里的注入点只需要按 buffer 是否存在来判定。
  */
 @Mixin(PostPass.class)
 public abstract class PostPassBuiltinUniformMixin {
@@ -42,10 +43,6 @@ public abstract class PostPassBuiltinUniformMixin {
             GpuBufferSlice shaderOrthoMatrix,
             CallbackInfo ci
     ) {
-        if (this.name == null || !this.name.startsWith("vpfxzip_")) {
-            return;
-        }
-
         GpuBuffer buffer = this.customUniforms.get(VpfxBuiltinUniformBuffer.BLOCK_NAME);
         if (buffer == null || buffer.isClosed()) {
             return;

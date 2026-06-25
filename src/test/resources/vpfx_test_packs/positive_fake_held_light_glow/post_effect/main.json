@@ -1,0 +1,18 @@
+{
+  "targets": {},
+  "passes": [
+    {
+      "id": "fake_held_light_glow",
+      "debug_label": "Fake Held-Light Glow",
+      "vertex_shader": "vpfx_fake_held_light_glow:composite/final",
+      "fragment_shader": "vpfx_fake_held_light_glow:composite/final",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:scene_color"
+        }
+      ],
+      "output": "minecraft:main"
+    }
+  ]
+}

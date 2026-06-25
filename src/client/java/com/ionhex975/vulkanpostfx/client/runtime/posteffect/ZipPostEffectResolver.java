@@ -10,12 +10,13 @@ import com.ionhex975.vulkanpostfx.client.effect.PostFxEffectRegistry;
  * - 但 ZIP 的 post_effect 内容会决定当前可见效果
  *
  * 支持：
- * - 任意 namespace，只要 path 是 post/grayscale、post/invert、post/blit
+ * - 任意 namespace，只要 path 是 post/grayscale、post/invert、post/blit、post/fake_held_light_glow
  */
 public final class ZipPostEffectResolver {
     private static final String PATH_GRAYSCALE = "post/grayscale";
     private static final String PATH_INVERT = "post/invert";
     private static final String PATH_BLIT = "post/blit";
+    private static final String PATH_FAKE_HELD_LIGHT_GLOW = "post/fake_held_light_glow";
 
     private ZipPostEffectResolver() {
     }
@@ -39,6 +40,10 @@ public final class ZipPostEffectResolver {
 
             if (PATH_INVERT.equals(fragmentPath)) {
                 return PostFxEffectRegistry.DEBUG_INVERT;
+            }
+
+            if (PATH_FAKE_HELD_LIGHT_GLOW.equals(fragmentPath)) {
+                return PostFxEffectRegistry.DEBUG_HELD_LIGHT_GLOW;
             }
         }
 

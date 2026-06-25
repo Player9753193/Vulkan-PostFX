@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "pack_id": "vpfx_fake_held_light_glow",
+  "name": "VPFX Fake Held-Light Glow",
+  "version": "1.0.0",
+  "author": "VPFX Team",
+  "description": "Official VPFX example pack for screen-space held-light glow. This is not true world lighting; it reads VpfxBuiltins held-light uniforms and adds a cheap post-process glow.",
+  "entry_post_effect": "post_effect/main.json",
+  "capabilities": {
+    "scene_color": true,
+    "scene_depth": false,
+    "shadow_depth": false,
+    "custom_targets": false,
+    "compute": false
+  }
+}

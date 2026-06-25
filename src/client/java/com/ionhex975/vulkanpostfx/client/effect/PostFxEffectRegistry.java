@@ -13,11 +13,13 @@ import java.util.Map;
  * - debug_invert：反色
  * - debug_grayscale：灰度
  * - debug_shadow_depth：直显 shadow depth
+ * - debug_held_light_glow：手持光源屏幕空间伪动态光
  */
 public final class PostFxEffectRegistry {
     public static final String DEBUG_INVERT = "debug_invert";
     public static final String DEBUG_GRAYSCALE = "debug_grayscale";
     public static final String DEBUG_SHADOW_DEPTH = "debug_shadow_depth";
+    public static final String DEBUG_HELD_LIGHT_GLOW = "debug_held_light_glow";
 
     private static final Map<String, PostFxEffectDefinition> EFFECTS = new LinkedHashMap<>();
 
@@ -46,6 +48,15 @@ public final class PostFxEffectRegistry {
                 Identifier.fromNamespaceAndPath("vulkanpostfx", "debug_shadow_depth"),
                 Identifier.withDefaultNamespace("invert"),
                 "Debug Shadow Depth"
+            )
+        );
+
+        register(
+            DEBUG_HELD_LIGHT_GLOW,
+            new PostFxEffectDefinition(
+                Identifier.fromNamespaceAndPath("vulkanpostfx", "debug_held_light_glow"),
+                Identifier.withDefaultNamespace("invert"),
+                "Debug Held-Light Glow"
             )
         );
     }

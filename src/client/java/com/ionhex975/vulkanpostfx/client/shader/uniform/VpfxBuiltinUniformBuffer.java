@@ -1,5 +1,7 @@
 package com.ionhex975.vulkanpostfx.client.shader.uniform;
 
+import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightInfo;
+import com.ionhex975.vulkanpostfx.client.light.VpfxHeldLightProvider;
 import com.ionhex975.vulkanpostfx.client.shadow.ShadowFrameState;
 import com.ionhex975.vulkanpostfx.client.shadow.ShadowMatricesLite;
 import com.mojang.blaze3d.buffers.GpuBuffer;
@@ -19,12 +21,14 @@ import java.nio.ByteBuffer;
 /**
  * VpfxBuiltins UBO writer。
  * 完整 GLSL 块定义见 {@link VpfxBuiltinUniformSourceInjector}。
- * 布局：13 × vec4 + 15 × mat4 = 1168 bytes (std140)。
+ * 布局：15 × vec4 + 15 × mat4 = 1200 bytes (std140)。
  */
 public final class VpfxBuiltinUniformBuffer {
     public static final String BLOCK_NAME = "VpfxBuiltins";
 
     public static final int UBO_SIZE = new Std140SizeCalculator()
+            .putVec4()
+            .putVec4()
             .putVec4()
             .putVec4()
             .putVec4()
@@ -185,6 +189,18 @@ public final class VpfxBuiltinUniformBuffer {
                             snapshot.upPositionX,
                             snapshot.upPositionY,
                             snapshot.upPositionZ,
+                            0.0F
+                    )
+                    .putVec4(
+                            snapshot.heldLightRed,
+                            snapshot.heldLightGreen,
+                            snapshot.heldLightBlue,
+                            snapshot.heldLightIntensity
+                    )
+                    .putVec4(
+                            snapshot.heldLightRadius,
+                            snapshot.heldLightEnabled ? 1.0F : 0.0F,
+                            0.0F,
                             0.0F
                     )
                     .putMat4f(snapshot.projectionMatrix)
@@ -358,6 +374,8 @@ public final class VpfxBuiltinUniformBuffer {
 
         float shadowBias = 0.0015F;
 
+        VpfxHeldLightInfo heldLight = VpfxHeldLightProvider.currentHeldLight();
+
         return new Snapshot(
                 cachedTimeSeconds,
                 cachedDeltaSeconds,
@@ -405,6 +423,12 @@ public final class VpfxBuiltinUniformBuffer {
                 upPosition.x,
                 upPosition.y,
                 upPosition.z,
+                heldLight.red(),
+                heldLight.green(),
+                heldLight.blue(),
+                heldLight.intensity(),
+                heldLight.radius(),
+                heldLight.enabled(),
                 projection.valid() ? projection.projectionMatrix() : new Matrix4f().identity(),
                 inverseProjection,
                 previousProjection,
@@ -495,6 +519,12 @@ public final class VpfxBuiltinUniformBuffer {
             float upPositionX,
             float upPositionY,
             float upPositionZ,
+            float heldLightRed,
+            float heldLightGreen,
+            float heldLightBlue,
+            float heldLightIntensity,
+            float heldLightRadius,
+            boolean heldLightEnabled,
             Matrix4f projectionMatrix,
             Matrix4f inverseProjectionMatrix,
             Matrix4f previousProjectionMatrix,

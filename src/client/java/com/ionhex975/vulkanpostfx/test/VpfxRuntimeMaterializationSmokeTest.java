@@ -78,7 +78,7 @@ public final class VpfxRuntimeMaterializationSmokeTest {
 
 		VpfxNativeZipPackLoader loader = new VpfxNativeZipPackLoader();
 
-		for (String packName : List.of("positive_minimal", "positive_showcase")) {
+		for (String packName : List.of("positive_minimal", "positive_showcase", "positive_fake_held_light_glow")) {
 			Path packDir = packsRoot.resolve(packName);
 			if (!Files.isDirectory(packDir)) {
 				System.out.println("  SKIP: " + packName + " not found");

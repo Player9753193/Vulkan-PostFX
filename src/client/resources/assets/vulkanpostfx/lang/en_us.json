@@ -168,5 +168,6 @@
   "command.vulkanpostfx.list.active": "Active: %s",
   "command.vulkanpostfx.off.done": "VPFX disabled. Vanilla rendering requested.",
   "command.vulkanpostfx.reload.failed": "VPFX reload failed safely. Vanilla rendering was requested. Check latest.log.",
-  "command.vulkanpostfx.reload.complete": "VPFX reload complete. Active: %s"
+  "command.vulkanpostfx.reload.complete": "VPFX reload complete. Active: %s",
+  "vulkanpostfx.hud.held_light": "Held light: %s"
 }

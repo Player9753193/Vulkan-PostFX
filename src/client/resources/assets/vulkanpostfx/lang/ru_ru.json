@@ -168,5 +168,6 @@
   "command.vulkanpostfx.list.active": "Активно: %s",
   "command.vulkanpostfx.off.done": "VPFX отключён. Запрошен vanilla-рендеринг.",
   "command.vulkanpostfx.reload.failed": "Безопасная перезагрузка VPFX завершилась с ошибкой. Запрошен vanilla-рендеринг. Проверьте latest.log.",
-  "command.vulkanpostfx.reload.complete": "Перезагрузка VPFX завершена. Активно: %s"
+  "command.vulkanpostfx.reload.complete": "Перезагрузка VPFX завершена. Активно: %s",
+  "vulkanpostfx.hud.held_light": "Свет в руке: %s"
 }

@@ -168,5 +168,6 @@
   "command.vulkanpostfx.list.active": "Actif : %s",
   "command.vulkanpostfx.off.done": "VPFX désactivé. Rendu vanilla demandé.",
   "command.vulkanpostfx.reload.failed": "Échec sécurisé du rechargement VPFX. Le rendu vanilla a été demandé. Vérifiez latest.log.",
-  "command.vulkanpostfx.reload.complete": "Rechargement VPFX terminé. Actif : %s"
+  "command.vulkanpostfx.reload.complete": "Rechargement VPFX terminé. Actif : %s",
+  "vulkanpostfx.hud.held_light": "Lumière tenue : %s"
 }
